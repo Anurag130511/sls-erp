@@ -1,0 +1,6 @@
+node_modules/
+backend/data/*.sqlite
+backend/storage/pdfs/*.pdf
+backend/.env
+frontend/dist/
+.DS_Store
