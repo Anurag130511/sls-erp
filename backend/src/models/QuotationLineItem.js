@@ -13,7 +13,13 @@ const QuotationLineItem = sequelize.define('QuotationLineItem', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   quotationId: { type: DataTypes.INTEGER, allowNull: false },
   parameterId: { type: DataTypes.INTEGER, allowNull: true },
-  sampleName: { type: DataTypes.STRING, allowNull: false },
+  // defaultValue lets Postgres backfill this onto any pre-existing rows
+  // when the column is first added to a live database (without it, an
+  // ALTER TABLE ... NOT NULL on a table that already has rows fails
+  // outright, since Postgres has nothing to put in the new column for
+  // them). The app always sets a real value explicitly on every new row,
+  // so this default is really just a one-time migration safety net.
+  sampleName: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
   description: { type: DataTypes.TEXT, allowNull: false },
   quantity: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 1 },
   unitPriceCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
