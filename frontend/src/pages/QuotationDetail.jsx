@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 
@@ -95,18 +95,37 @@ export default function QuotationDetail() {
 
       <table className="data-table" style={{ marginBottom: 20 }}>
         <thead>
-          <tr><th>Sample Name</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Line Total</th></tr>
+          <tr><th>Sample / Parameter</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>
         </thead>
         <tbody>
-          {quotation.lineItems.map((li) => (
-            <tr key={li.id}>
-              <td>{li.description}</td>
-              <td>{Number(li.quantity).toFixed(2)}</td>
-              <td>{fmt(li.unitPriceCents)}</td>
-              <td>{fmt(li.discountCents)}</td>
-              <td>{fmt(li.lineTotalCents)}</td>
-            </tr>
-          ))}
+          {(() => {
+            // Group the flat line items back into samples for display —
+            // each line already carries its sampleName.
+            const groups = [];
+            for (const li of quotation.lineItems) {
+              let group = groups.find((g) => g.sampleName === li.sampleName);
+              if (!group) {
+                group = { sampleName: li.sampleName, parameters: [] };
+                groups.push(group);
+              }
+              group.parameters.push(li);
+            }
+            return groups.map((group) => (
+              <Fragment key={group.sampleName}>
+                <tr key={`sample-${group.sampleName}`} style={{ background: 'var(--gray-light)' }}>
+                  <td colSpan={4} style={{ fontWeight: 700, color: 'var(--green-dark)' }}>{group.sampleName}</td>
+                </tr>
+                {group.parameters.map((li) => (
+                  <tr key={li.id}>
+                    <td style={{ paddingLeft: 28 }}>{li.description}</td>
+                    <td>{Number(li.quantity).toFixed(2)}</td>
+                    <td>{fmt(li.unitPriceCents)}</td>
+                    <td>{fmt(li.lineTotalCents)}</td>
+                  </tr>
+                ))}
+              </Fragment>
+            ));
+          })()}
         </tbody>
       </table>
 

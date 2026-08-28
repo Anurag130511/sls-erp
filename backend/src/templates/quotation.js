@@ -9,19 +9,38 @@ function quotationHtml(quotation, org, logoDataUri) {
       : quotation.salesPersonName
     : null;
 
-  const rows = quotation.lineItems
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(
-      (li, idx) => `
+  // Group flat line items back into samples (each line already carries
+  // its sampleName), preserving the order they were entered in.
+  const sorted = [...quotation.lineItems].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sampleGroups = [];
+  for (const li of sorted) {
+    let group = sampleGroups.find((g) => g.sampleName === li.sampleName);
+    if (!group) {
+      group = { sampleName: li.sampleName, parameters: [] };
+      sampleGroups.push(group);
+    }
+    group.parameters.push(li);
+  }
+
+  const rows = sampleGroups
+    .map((group) => {
+      const sampleHeaderRow = `
+      <tr class="sample-row">
+        <td colspan="4">${escapeHtml(group.sampleName)}</td>
+      </tr>`;
+      const paramRows = group.parameters
+        .map(
+          (li) => `
       <tr>
-        <td>${idx + 1}</td>
-        <td>${escapeHtml(li.description)}</td>
+        <td style="padding-left:24px;">${escapeHtml(li.description)}</td>
         <td class="num">${Number(li.quantity).toFixed(2)}</td>
         <td class="num">${formatINR(li.unitPriceCents)}</td>
-        <td class="num">${formatINR(li.discountCents)}</td>
         <td class="num">${formatINR(li.lineTotalCents)}</td>
       </tr>`
-    )
+        )
+        .join('');
+      return sampleHeaderRow + paramRows;
+    })
     .join('');
 
   return `<!doctype html>
@@ -70,11 +89,9 @@ function quotationHtml(quotation, org, logoDataUri) {
     <table class="items">
       <thead>
         <tr>
-          <th style="width:32px;">#</th>
-          <th>Sample Name</th>
+          <th>Sample / Parameter</th>
           <th class="num" style="width:60px;">Qty</th>
           <th class="num" style="width:90px;">Unit Price</th>
-          <th class="num" style="width:80px;">Discount</th>
           <th class="num" style="width:100px;">Line Total</th>
         </tr>
       </thead>

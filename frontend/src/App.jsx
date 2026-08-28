@@ -44,7 +44,6 @@ function Layout({ children }) {
           <NavLink to="/customers">Customers</NavLink>
           <NavLink to="/vendors">Vendors</NavLink>
           <NavLink to="/parameters">Parameters</NavLink>
-          <NavLink to="/items">Items</NavLink>
           {user?.role === 'admin' && <NavLink to="/users">Users</NavLink>}
           {user?.role === 'admin' && <NavLink to="/reports">Reports</NavLink>}
         </nav>

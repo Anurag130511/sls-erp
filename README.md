@@ -370,28 +370,39 @@ sending a single document to a customer or vendor.
 
 ## Parameters, GST, and user designations (lab-specific)
 
-Quotations are built around **Parameters** now, not generic "Items" —
-a separate catalog from the Items used by Purchase Orders, since the
-two are genuinely different things for a testing lab:
+Quotations are built around **Samples**, each containing one or more
+**Parameters** — matching how this lab actually quotes: a customer
+sends samples, and each sample gets tested for a set of parameters.
 
-- **Parameters** (Customers page → sidebar) are what you sell — lab
-  test parameters like pH, Total Coliform Count, TDS — each with its
-  own price. Manage them at **Parameters** in the sidebar: add one at a
-  time, or bulk-upload a spreadsheet (same pattern as Customers/Vendors/
-  Items — download the template first for exact column names).
-- **Items** (unchanged) are what you buy — materials/reagents from
-  vendors on Purchase Orders.
-- On a quotation, each line lets you either pick a Parameter from the
-  dropdown (auto-fills price) or type a fully custom line — so a
-  one-off test that isn't in your master list never blocks you.
-- The per-line free-text field is labeled **"Sample Name"** on
-  quotations (was "Description") — matching how this lab actually
-  describes each line.
+- Enter a **Sample Name** once per sample (e.g. "Borewell Water — Site A").
+- Under it, **"+ Add Parameter"** adds another test to that same sample
+  — no need to re-type the sample name for each one.
+- **"+ Add Sample"** starts a new sample block, for quoting multiple
+  samples in one quotation.
+- Each parameter can be picked from the **Parameters** catalog
+  (auto-fills its price) or typed completely freely. **Typing a new one
+  automatically saves it to the Parameters catalog** — so the next
+  quotation can pick it from the dropdown instead of retyping it. Matching
+  is by name, so retyping an existing parameter's name reuses it rather
+  than creating a duplicate.
+- **Discount is a single field for the whole quotation** (not per
+  parameter) — enter it once near the bottom of the form, and it comes
+  off the subtotal before GST is calculated.
+- Manage the Parameters catalog directly at **Parameters** in the
+  sidebar too: add one at a time, or bulk-upload a spreadsheet (same
+  pattern as Customers/Vendors — download the template first for exact
+  column names).
+- **Items** (materials/reagents bought from vendors on Purchase Orders)
+  is a separate, unchanged catalog — no longer in the sidebar nav since
+  day-to-day work here is quotation-focused, but still reachable at
+  `/items` if you need to manage it, and Purchase Orders still use it
+  exactly as before.
 
 **GST**: quotations have an "Include GST (18%)" checkbox. Leave it
 unchecked for a GST-exclusive quote, or check it to add 18% to the
-total automatically — shown as its own line on both the quotation
-detail page and the PDF.
+post-discount total automatically — shown as its own line on both the
+quotation detail page and the PDF, which now also groups line items
+under their sample name to match how you entered them.
 
 **User designations**: when creating a user (Users page, admin only),
 you can set a designation (e.g. "Sales Executive," "Lab Manager")

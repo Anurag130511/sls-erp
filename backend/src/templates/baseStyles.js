@@ -91,6 +91,13 @@ const baseStyles = `
   }
   table.items tbody td.num { text-align: right; white-space: nowrap; }
   table.items tbody tr:nth-child(even) { background: ${BRAND.grayLight}; }
+  table.items tbody tr.sample-row td {
+    font-weight: 700;
+    background: ${BRAND.grayLight};
+    border-bottom: 1px solid ${BRAND.green};
+    color: ${BRAND.greenDark};
+    padding-top: 10px;
+  }
 
   .totals {
     width: 320px;
