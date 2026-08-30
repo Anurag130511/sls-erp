@@ -6,10 +6,11 @@ import SampleParameterEditor from '../components/SampleParameterEditor';
 
 const emptySample = () => ({
   sampleName: '',
-  parameters: [{ parameterId: null, description: '' }],
+  parameters: [{ parameterId: null, description: '', charges: '' }],
   sampleQty: 1,
-  chargesPerSample: '',
   sampleCount: 1,
+  combinedPricing: false,
+  combinedPrice: '',
 });
 
 export default function QuotationForm() {
@@ -43,10 +44,13 @@ export default function QuotationForm() {
   const removeSample = (idx) => setSamples(samples.filter((_, i) => i !== idx));
 
   // Running totals shown live on the form, before the server's own calc.
-  const subtotal = samples.reduce(
-    (sum, s) => sum + Number(s.chargesPerSample || 0) * Number(s.sampleQty || 1) * Number(s.sampleCount || 1),
-    0
-  );
+  const sampleTotal = (s) => {
+    const perUnit = s.combinedPricing
+      ? Number(s.combinedPrice || 0)
+      : s.parameters.reduce((sum, p) => sum + Number(p.charges || 0), 0);
+    return perUnit * Number(s.sampleQty || 1) * Number(s.sampleCount || 1);
+  };
+  const subtotal = samples.reduce((sum, s) => sum + sampleTotal(s), 0);
   const afterDiscount = subtotal - Number(discount || 0);
   const gstAmount = gstApplicable ? afterDiscount * 0.18 : 0;
   const grandTotal = afterDiscount + gstAmount;

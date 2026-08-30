@@ -11,48 +11,63 @@ const INCLUDE = [
 
 /**
  * Converts the samples the form sends into one QuotationLineItem row per
- * sample (matching the lab's real quotation format — pricing is always
- * per-sample: Charges/Sample x Sample Qty x Sample Count). Every named
+ * PARAMETER (each gets its own Sr. No. in the table). Every named
  * parameter (typed or picked from the catalog) is auto-saved to the
  * Parameter catalog if it doesn't already exist there — matching is by
  * exact name (case-insensitive) so re-typing an existing one reuses it
- * instead of creating a duplicate — even though pricing itself no longer
- * lives on individual parameters.
+ * instead of creating a duplicate.
+ *
+ * Each sample chooses individual or combined pricing:
+ *  - Individual: every parameter row has its own charge; Total = that
+ *    charge x sampleQty x sampleCount, shown separately per row.
+ *  - Combined: one charge for the whole sample lands on its first
+ *    parameter row (chargesPerSampleCents on the rest is 0); the
+ *    detail page/PDF render that as a single merged cell spanning every
+ *    parameter row in the group instead of repeating/blanking it.
  */
 async function buildLinesAndSaveNewParameters(samples, t) {
   const lines = [];
   let sortOrder = 0;
 
-  for (const sample of samples) {
+  for (let sampleIndex = 0; sampleIndex < samples.length; sampleIndex++) {
+    const sample = samples[sampleIndex];
     const sampleName = (sample.sampleName || '').trim();
-    const parameterNames = (sample.parameters || [])
-      .map((p) => (p.description || '').trim())
-      .filter(Boolean);
-
-    for (const name of parameterNames) {
-      const existing = await Parameter.findOne({
-        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), name.toLowerCase()),
-        transaction: t,
-      });
-      if (!existing) {
-        await Parameter.create({ name, unitPriceCents: 0, unit: 'test' }, { transaction: t });
-      }
-    }
-
     const sampleQty = Number(sample.sampleQty || 1);
-    const chargesPerSampleCents = toCents(sample.chargesPerSample || 0);
     const sampleCount = Number(sample.sampleCount || 1);
-    const lineTotalCents = Math.round(chargesPerSampleCents * sampleQty * sampleCount);
+    const isCombinedPricing = Boolean(sample.combinedPricing);
+    const combinedChargeCents = isCombinedPricing ? toCents(sample.combinedPrice || 0) : 0;
 
-    lines.push({
-      sampleName,
-      parametersText: parameterNames.join(', '),
-      sampleQty,
-      chargesPerSampleCents,
-      sampleCount,
-      lineTotalCents,
-      sortOrder: sortOrder++,
-    });
+    for (let i = 0; i < sample.parameters.length; i++) {
+      const param = sample.parameters[i];
+      const parameterName = (param.description || '').trim();
+
+      if (parameterName) {
+        const existing = await Parameter.findOne({
+          where: sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), parameterName.toLowerCase()),
+          transaction: t,
+        });
+        if (!existing) {
+          await Parameter.create({ name: parameterName, unitPriceCents: 0, unit: 'test' }, { transaction: t });
+        }
+      }
+
+      const chargesPerSampleCents = isCombinedPricing
+        ? (i === 0 ? combinedChargeCents : 0)
+        : toCents(param.charges || 0);
+      const lineTotalCents = Math.round(chargesPerSampleCents * sampleQty * sampleCount);
+
+      lines.push({
+        sampleName,
+        sampleIndex,
+        parameterName,
+        sampleQty,
+        sampleCount,
+        isCombinedPricing,
+        chargesPerSampleCents,
+        lineTotalCents,
+        sortOrder: sortOrder++,
+      });
+    }
   }
 
   return lines;

@@ -97,22 +97,50 @@ export default function QuotationDetail() {
       <table className="data-table" style={{ marginBottom: 20 }}>
         <thead>
           <tr>
-            <th>Sr. No.</th><th>Sample Name</th><th>Parameters</th>
+            <th>Sr. No.</th><th>Sample Name</th><th>Parameter</th>
             <th>Sample Qty.</th><th>Charges/Sample</th><th>Sample Count</th><th>Total</th>
           </tr>
         </thead>
         <tbody>
-          {[...quotation.lineItems].sort((a, b) => a.sortOrder - b.sortOrder).map((li, idx) => (
-            <tr key={li.id}>
-              <td>{idx + 1}</td>
-              <td>{li.sampleName}</td>
-              <td>{li.parametersText}</td>
-              <td>{Number(li.sampleQty).toFixed(0)}</td>
-              <td>{fmt(li.chargesPerSampleCents)}</td>
-              <td>{Number(li.sampleCount).toFixed(0)}</td>
-              <td>{fmt(li.lineTotalCents)}</td>
-            </tr>
-          ))}
+          {(() => {
+            const sorted = [...quotation.lineItems].sort((a, b) => a.sortOrder - b.sortOrder);
+            const groups = [];
+            for (const li of sorted) {
+              let group = groups.find((g) => g.sampleIndex === li.sampleIndex);
+              if (!group) {
+                group = { sampleIndex: li.sampleIndex, sampleName: li.sampleName, rows: [] };
+                groups.push(group);
+              }
+              group.rows.push(li);
+            }
+
+            let srNo = 0;
+            return groups.flatMap((group) => {
+              const rowCount = group.rows.length;
+              const isCombined = group.rows[0]?.isCombinedPricing;
+              const combinedTotalCents = group.rows.reduce((sum, li) => sum + li.lineTotalCents, 0);
+
+              return group.rows.map((li, i) => {
+                srNo++;
+                const first = i === 0;
+                return (
+                  <tr key={li.id}>
+                    <td>{srNo}</td>
+                    {first && <td rowSpan={rowCount}>{group.sampleName}</td>}
+                    <td>{li.parameterName}</td>
+                    {first && <td rowSpan={rowCount}>{Number(li.sampleQty).toFixed(0)}</td>}
+                    {isCombined
+                      ? (first && <td rowSpan={rowCount}>{fmt(group.rows[0].chargesPerSampleCents)}</td>)
+                      : <td>{fmt(li.chargesPerSampleCents)}</td>}
+                    {first && <td rowSpan={rowCount}>{Number(li.sampleCount).toFixed(0)}</td>}
+                    {isCombined
+                      ? (first && <td rowSpan={rowCount} style={{ fontWeight: 700 }}>{fmt(combinedTotalCents)}</td>)
+                      : <td>{fmt(li.lineTotalCents)}</td>}
+                  </tr>
+                );
+              });
+            });
+          })()}
         </tbody>
       </table>
 

@@ -23,11 +23,10 @@ const styles = `
     padding-bottom: 10px;
     margin-bottom: 14px;
   }
-  .letterhead .company-name { font-weight: 700; font-size: 13px; }
   .letterhead .accreditation { font-size: 11px; }
   .letterhead .accreditation a { color: #1a56db; }
   .letterhead-body { flex: 1; }
-  .letterhead-logo { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .letterhead-logo { display: flex; align-items: center; gap: 10px; }
   .letterhead-logo img { height: 46px; }
   .letterhead-details { font-size: 10.5px; color: #333; }
   .letterhead-details a { color: #1a56db; }
@@ -39,13 +38,18 @@ const styles = `
     margin-bottom: 10px;
   }
 
+  .letter-box {
+    border: 1px solid #999;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
   .letter-fields div { margin-bottom: 2px; }
   .letter-fields .label { font-weight: 700; }
 
   .greeting { margin: 14px 0; }
   .greeting p { margin: 4px 0; }
 
-  .signoff { margin: 14px 0; }
+  .signoff { margin: 14px 0 0 0; }
   .signoff .label { text-decoration: underline; }
 
   table.items {
@@ -57,6 +61,7 @@ const styles = `
     border: 1px solid #999;
     padding: 6px 8px;
     font-size: 11px;
+    vertical-align: top;
   }
   table.items th {
     background: #cfe8ef;
@@ -119,20 +124,60 @@ function quotationHtml(quotation, org, logoDataUri) {
   const salesPersonName = quotation.salesPersonName || '';
   const salesPersonContactNo = quotation.salesPersonContactNo || '';
 
-  const rows = [...quotation.lineItems]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(
-      (li, idx) => `
+  // Group the flat (one-row-per-parameter) line items back into samples
+  // — by sampleIndex, not sampleName, so two samples that happen to
+  // share the same name are never merged by mistake. Sample Name /
+  // Sample Qty. / Sample Count / (combined) Charges & Total each render
+  // as one cell spanning every parameter row in that sample.
+  const sorted = [...quotation.lineItems].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sampleGroups = [];
+  for (const li of sorted) {
+    let group = sampleGroups.find((g) => g.sampleIndex === li.sampleIndex);
+    if (!group) {
+      group = { sampleIndex: li.sampleIndex, sampleName: li.sampleName, rows: [] };
+      sampleGroups.push(group);
+    }
+    group.rows.push(li);
+  }
+
+  let srNo = 0;
+  const rows = sampleGroups
+    .map((group) => {
+      const rowCount = group.rows.length;
+      const isCombined = group.rows[0]?.isCombinedPricing;
+      const combinedTotalCents = group.rows.reduce((sum, li) => sum + li.lineTotalCents, 0);
+
+      return group.rows
+        .map((li, i) => {
+          srNo++;
+          const first = i === 0;
+          const sampleCell = first ? `<td rowspan="${rowCount}">${escapeHtml(group.sampleName)}</td>` : '';
+          const qtyCell = first ? `<td class="num" rowspan="${rowCount}">${Number(li.sampleQty).toFixed(0)}</td>` : '';
+          const countCell = first ? `<td class="num" rowspan="${rowCount}">${Number(li.sampleCount).toFixed(0)}</td>` : '';
+
+          let chargeCell;
+          let totalCell;
+          if (isCombined) {
+            chargeCell = first ? `<td class="num" rowspan="${rowCount}">${formatINR(group.rows[0].chargesPerSampleCents)}</td>` : '';
+            totalCell = first ? `<td class="num" rowspan="${rowCount}"><strong>${formatINR(combinedTotalCents)}</strong></td>` : '';
+          } else {
+            chargeCell = `<td class="num">${formatINR(li.chargesPerSampleCents)}</td>`;
+            totalCell = `<td class="num">${formatINR(li.lineTotalCents)}</td>`;
+          }
+
+          return `
       <tr>
-        <td class="center">${idx + 1}</td>
-        <td>${escapeHtml(li.sampleName)}</td>
-        <td>${escapeHtml(li.parametersText)}</td>
-        <td class="num">${Number(li.sampleQty).toFixed(0)}</td>
-        <td class="num">${formatINR(li.chargesPerSampleCents)}</td>
-        <td class="num">${Number(li.sampleCount).toFixed(0)}</td>
-        <td class="num">${formatINR(li.lineTotalCents)}</td>
-      </tr>`
-    )
+        <td class="center">${srNo}</td>
+        ${sampleCell}
+        <td>${escapeHtml(li.parameterName)}</td>
+        ${qtyCell}
+        ${chargeCell}
+        ${countCell}
+        ${totalCell}
+      </tr>`;
+        })
+        .join('');
+    })
     .join('');
 
   const bankDetailsLine = [org.bankAccountName, org.bankName].filter(Boolean).join(', ');
@@ -151,7 +196,6 @@ function quotationHtml(quotation, org, logoDataUri) {
   <body>
     <div class="letterhead">
       <div class="letterhead-body">
-        <div class="company-name">${escapeHtml(org.name.toUpperCase())}</div>
         <div class="letterhead-logo">
           <img src="${logoDataUri}" />
           <div class="letterhead-details">
@@ -169,26 +213,28 @@ function quotationHtml(quotation, org, logoDataUri) {
       <div>Date: ${escapeHtml(quotation.issueDate)}</div>
     </div>
 
-    <div class="letter-fields">
-      <div><span class="label">Company Name:</span> ${escapeHtml(quotation.customer?.name || '-')}</div>
-      <div><span class="label">Contact Person:</span> ${escapeHtml(quotation.customer?.contactPerson || '')}</div>
-      <div><span class="label">Email:</span> ${escapeHtml(quotation.customer?.email || '')}</div>
-      <div><span class="label">Mobile No.:</span> ${escapeHtml(quotation.customer?.phone || '')}</div>
-      <div><span class="label">Sub. :-</span> ${escapeHtml(quotation.subject || '')}</div>
-    </div>
+    <div class="letter-box">
+      <div class="letter-fields">
+        <div><span class="label">Company Name:</span> ${escapeHtml(quotation.customer?.name || '-')}</div>
+        <div><span class="label">Contact Person:</span> ${escapeHtml(quotation.customer?.contactPerson || '')}</div>
+        <div><span class="label">Email:</span> ${escapeHtml(quotation.customer?.email || '')}</div>
+        <div><span class="label">Mobile No.:</span> ${escapeHtml(quotation.customer?.phone || '')}</div>
+        <div><span class="label">Sub. :-</span> ${escapeHtml(quotation.subject || '')}</div>
+      </div>
 
-    <div class="greeting">
-      <p>Dear Sir/Madam,</p>
-      <p><strong>Greetings from ${escapeHtml(org.name)}.</strong></p>
-      <p>With reference to our discussion, please find below the quotation.</p>
-      <p>Please get in touch with us for further clarification.</p>
-    </div>
+      <div class="greeting">
+        <p>Dear Sir/Madam,</p>
+        <p><strong>Greetings from ${escapeHtml(org.name)}</strong></p>
+        <p>With reference to our discussion, please find below the quotation.</p>
+        <p>Please get in touch with us for further clarification.</p>
+      </div>
 
-    <div class="signoff">
-      <p class="label">Warm regards,</p>
-      <div>${escapeHtml(org.name)}</div>
-      ${salesPersonName ? `<div>${escapeHtml(salesPersonName)}</div>` : ''}
-      ${salesPersonContactNo ? `<div>Mob: ${escapeHtml(salesPersonContactNo)}</div>` : ''}
+      <div class="signoff">
+        <p class="label">Warm regards,</p>
+        <div>${escapeHtml(org.name)}</div>
+        ${salesPersonName ? `<div>${escapeHtml(salesPersonName)}</div>` : ''}
+        ${salesPersonContactNo ? `<div>Mob: ${escapeHtml(salesPersonContactNo)}</div>` : ''}
+      </div>
     </div>
 
     <table class="items">
