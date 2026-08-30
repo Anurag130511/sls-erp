@@ -4,7 +4,13 @@ import { api } from '../api/client';
 import { useAuth } from '../api/AuthContext';
 import SampleParameterEditor from '../components/SampleParameterEditor';
 
-const emptySample = () => ({ sampleName: '', parameters: [{ parameterId: null, description: '', unitPrice: '' }] });
+const emptySample = () => ({
+  sampleName: '',
+  parameters: [{ parameterId: null, description: '' }],
+  sampleQty: 1,
+  chargesPerSample: '',
+  sampleCount: 1,
+});
 
 export default function QuotationForm() {
   const navigate = useNavigate();
@@ -14,10 +20,11 @@ export default function QuotationForm() {
   const [customerId, setCustomerId] = useState('');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [expiryDate, setExpiryDate] = useState('');
-  const [terms, setTerms] = useState('This quotation is valid until the date shown above.\nPrices are exclusive of applicable taxes unless stated otherwise.');
+  const [subject, setSubject] = useState('');
+  const [terms, setTerms] = useState('');
   const [samples, setSamples] = useState([emptySample()]);
   const [discount, setDiscount] = useState('0');
-  const [gstApplicable, setGstApplicable] = useState(false);
+  const [gstApplicable, setGstApplicable] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -37,7 +44,7 @@ export default function QuotationForm() {
 
   // Running totals shown live on the form, before the server's own calc.
   const subtotal = samples.reduce(
-    (sum, s) => sum + s.parameters.reduce((pSum, p) => pSum + Number(p.unitPrice || 0), 0),
+    (sum, s) => sum + Number(s.chargesPerSample || 0) * Number(s.sampleQty || 1) * Number(s.sampleCount || 1),
     0
   );
   const afterDiscount = subtotal - Number(discount || 0);
@@ -50,7 +57,9 @@ export default function QuotationForm() {
     if (!customerId) return setError('Please select a customer.');
     for (const s of samples) {
       if (!s.sampleName.trim()) return setError('Every sample needs a name.');
-      if (s.parameters.length === 0) return setError(`Add at least one parameter for "${s.sampleName}".`);
+      if (s.parameters.length === 0 || s.parameters.some((p) => !p.description.trim())) {
+        return setError(`Add at least one parameter for "${s.sampleName}".`);
+      }
     }
     setSaving(true);
     try {
@@ -58,6 +67,7 @@ export default function QuotationForm() {
         customerId: Number(customerId),
         issueDate,
         expiryDate: expiryDate || null,
+        subject,
         terms,
         samples,
         discount: Number(discount || 0),
@@ -82,7 +92,7 @@ export default function QuotationForm() {
 
       <form onSubmit={submit}>
         <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Customer *</label>
               <select required value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
@@ -102,6 +112,10 @@ export default function QuotationForm() {
               <label>Sales Person</label>
               <input value={salesPersonDisplay} disabled style={{ background: '#F4F4F4', color: '#666' }} />
             </div>
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Subject</label>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Quotation for Water Testing Services" />
           </div>
         </div>
 
@@ -142,24 +156,26 @@ export default function QuotationForm() {
 
           <div style={{ width: 300, marginLeft: 'auto', fontSize: 13, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span>
+              <span>Total</span><span>₹{subtotal.toFixed(2)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span>Discount</span><span>-₹{Number(discount || 0).toFixed(2)}</span>
-            </div>
+            {Number(discount || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span>Discount</span><span>-₹{Number(discount || 0).toFixed(2)}</span>
+              </div>
+            )}
             {gstApplicable && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span>GST @ 18%</span><span>₹{gstAmount.toFixed(2)}</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--green-dark)' }}>
-              <span>Total</span><span>₹{grandTotal.toFixed(2)}</span>
+              <span>Grand Total</span><span>₹{grandTotal.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="field">
-            <label>Terms &amp; Notes (one per line)</label>
-            <textarea rows={3} value={terms} onChange={(e) => setTerms(e.target.value)} />
+            <label>Additional Terms (optional, one per line — added below the standard terms)</label>
+            <textarea rows={2} value={terms} onChange={(e) => setTerms(e.target.value)} />
           </div>
 
           {error && <p style={{ color: '#C0392B' }}>{error}</p>}

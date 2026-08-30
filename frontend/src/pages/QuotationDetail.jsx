@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 
@@ -83,6 +83,7 @@ export default function QuotationDetail() {
           <div>
             <strong>Customer:</strong> {quotation.customer?.name}<br />
             <span style={{ color: '#666', fontSize: 13 }}>{quotation.customer?.address}</span>
+            {quotation.subject && <div style={{ marginTop: 6, fontSize: 13 }}><strong>Subject:</strong> {quotation.subject}</div>}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div><strong>Issue Date:</strong> {quotation.issueDate}</div>
@@ -95,37 +96,23 @@ export default function QuotationDetail() {
 
       <table className="data-table" style={{ marginBottom: 20 }}>
         <thead>
-          <tr><th>Sample / Parameter</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>
+          <tr>
+            <th>Sr. No.</th><th>Sample Name</th><th>Parameters</th>
+            <th>Sample Qty.</th><th>Charges/Sample</th><th>Sample Count</th><th>Total</th>
+          </tr>
         </thead>
         <tbody>
-          {(() => {
-            // Group the flat line items back into samples for display —
-            // each line already carries its sampleName.
-            const groups = [];
-            for (const li of quotation.lineItems) {
-              let group = groups.find((g) => g.sampleName === li.sampleName);
-              if (!group) {
-                group = { sampleName: li.sampleName, parameters: [] };
-                groups.push(group);
-              }
-              group.parameters.push(li);
-            }
-            return groups.map((group) => (
-              <Fragment key={group.sampleName}>
-                <tr key={`sample-${group.sampleName}`} style={{ background: 'var(--gray-light)' }}>
-                  <td colSpan={4} style={{ fontWeight: 700, color: 'var(--green-dark)' }}>{group.sampleName}</td>
-                </tr>
-                {group.parameters.map((li) => (
-                  <tr key={li.id}>
-                    <td style={{ paddingLeft: 28 }}>{li.description}</td>
-                    <td>{Number(li.quantity).toFixed(2)}</td>
-                    <td>{fmt(li.unitPriceCents)}</td>
-                    <td>{fmt(li.lineTotalCents)}</td>
-                  </tr>
-                ))}
-              </Fragment>
-            ));
-          })()}
+          {[...quotation.lineItems].sort((a, b) => a.sortOrder - b.sortOrder).map((li, idx) => (
+            <tr key={li.id}>
+              <td>{idx + 1}</td>
+              <td>{li.sampleName}</td>
+              <td>{li.parametersText}</td>
+              <td>{Number(li.sampleQty).toFixed(0)}</td>
+              <td>{fmt(li.chargesPerSampleCents)}</td>
+              <td>{Number(li.sampleCount).toFixed(0)}</td>
+              <td>{fmt(li.lineTotalCents)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 

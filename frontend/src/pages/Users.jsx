@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../api/AuthContext';
 
-const emptyForm = { name: '', email: '', password: '', role: 'manager', designation: '' };
+const emptyForm = { name: '', email: '', password: '', role: 'manager', designation: '', contactNo: '' };
 const ROLE_HELP = {
   admin: 'Full access, including managing other users',
   manager: 'Can create and edit quotations, purchase orders, customers, vendors, items',
@@ -53,6 +53,17 @@ export default function Users() {
     }
   };
 
+  const editContactNo = async (u) => {
+    const newContactNo = prompt(`Set contact number for ${u.name}:`, u.contactNo || '');
+    if (newContactNo === null) return;
+    try {
+      await api.put(`/users/${u.id}`, { contactNo: newContactNo });
+      load();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const remove = async (u) => {
     if (!confirm(`Remove ${u.name}'s login? They won't be able to sign in anymore.`)) return;
     try {
@@ -84,7 +95,7 @@ export default function Users() {
       </div>
       <p style={{ color: '#777', fontSize: 13, marginTop: -10, marginBottom: 20 }}>
         Each person should have their own login — avoid sharing one account across a team.
-        Name and designation show on quotations and purchase orders they create.
+        Name, designation, and contact number show on quotations and purchase orders they create.
       </p>
 
       {showForm && (
@@ -102,6 +113,10 @@ export default function Users() {
               <div className="field">
                 <label>Email *</label>
                 <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Contact No.</label>
+                <input value={form.contactNo} onChange={(e) => setForm({ ...form, contactNo: e.target.value })} placeholder="e.g. +91 9876543210" />
               </div>
               <div className="field">
                 <label>Temporary Password *</label>
@@ -128,7 +143,7 @@ export default function Users() {
       ) : (
         <table className="data-table">
           <thead>
-            <tr><th>Name</th><th>Designation</th><th>Email</th><th>Role</th><th></th></tr>
+            <tr><th>Name</th><th>Designation</th><th>Email</th><th>Contact No.</th><th>Role</th><th></th></tr>
           </thead>
           <tbody>
             {users.map((u) => (
@@ -140,6 +155,11 @@ export default function Users() {
                   </span>
                 </td>
                 <td>{u.email}</td>
+                <td>
+                  <span style={{ cursor: 'pointer' }} onClick={() => editContactNo(u)} title="Click to edit">
+                    {u.contactNo || <span style={{ color: '#aaa' }}>— set —</span>}
+                  </span>
+                </td>
                 <td>
                   <select value={u.role} onChange={(e) => changeRole(u, e.target.value)} style={{ width: 'auto', padding: '4px 8px' }}>
                     <option value="admin">Admin</option>

@@ -22,6 +22,31 @@ function getOrgFromEnv() {
   };
 }
 
+// Quotations use their own letterhead details, separate from the shared
+// ORG_* used by Purchase Orders' "Ship To" block — those are genuinely
+// different addresses for this business (a receiving/shipping address
+// for vendor deliveries vs. the lab's own letterhead address for
+// quotations). Each QUOTE_ORG_* falls back to the shared ORG_* value if
+// not set, so setting only the shared ones still mostly works.
+function getQuotationOrgFromEnv() {
+  return {
+    name: process.env.QUOTE_ORG_NAME || process.env.ORG_NAME || 'Your Company Pvt. Ltd.',
+    address: process.env.QUOTE_ORG_ADDRESS || process.env.ORG_ADDRESS || '',
+    email: process.env.QUOTE_ORG_EMAIL || process.env.ORG_EMAIL || '',
+    phone: process.env.QUOTE_ORG_PHONE || process.env.ORG_PHONE || '',
+    gst: process.env.QUOTE_ORG_GST || process.env.ORG_GST || '',
+    pan: process.env.QUOTE_ORG_PAN || '',
+    accreditation: process.env.QUOTE_ORG_ACCREDITATION || '', // e.g. "(NABL Accredited Laboratory), TC-11169"
+    footerAddress: process.env.QUOTE_ORG_FOOTER_ADDRESS || '', // corporate/registered address line for the PDF footer
+    quoteValidityDays: process.env.QUOTE_ORG_VALIDITY_DAYS || '30',
+    bankAccountName: process.env.QUOTE_ORG_BANK_ACCOUNT_NAME || '',
+    bankName: process.env.QUOTE_ORG_BANK_NAME || '',
+    bankAccountNo: process.env.QUOTE_ORG_BANK_ACCOUNT_NO || '',
+    bankBranch: process.env.QUOTE_ORG_BANK_BRANCH || '',
+    bankIfsc: process.env.QUOTE_ORG_BANK_IFSC || '',
+  };
+}
+
 // A single shared browser instance is reused across requests — launching
 // Chromium per-request is slow. It's started lazily on first use.
 let browserPromise = null;
@@ -57,7 +82,7 @@ async function generatePurchaseOrderPdf(po) {
 }
 
 async function generateQuotationPdf(quotation) {
-  const html = quotationHtml(quotation, getOrgFromEnv(), getLogoDataUri());
+  const html = quotationHtml(quotation, getQuotationOrgFromEnv(), getLogoDataUri());
   return renderPdf(html);
 }
 

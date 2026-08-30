@@ -1,29 +1,22 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-// Each row is one (sample, parameter) pairing — sampleName is repeated
-// across every parameter tested for the same sample, so a quotation's
-// lines can be grouped back into "Sample A: pH, TDS / Sample B: pH" for
-// display. "description" holds the parameter's own name/description.
-// quantity stays at 1 (tests aren't ordered in bulk) and discountCents
-// stays 0 per line — discount is applied once, at the quotation level,
-// not per parameter. Both snapshotted at creation time so historical
-// quotations stay accurate if catalog prices change later.
+// Matches the lab's real quotation format: one row per SAMPLE (not per
+// parameter). "parametersText" lists every parameter tested for that
+// sample as a single display string (e.g. "pH, TDS, Total Coliform"),
+// since pricing is always per-sample here — Charges/Sample × Sample Qty
+// × Sample Count = Total. Every field below has a defaultValue so adding
+// them to a live database (via alter:true) never fails on existing rows
+// that predate this shape — see the "sampleName" migration note this
+// pattern replaced.
 const QuotationLineItem = sequelize.define('QuotationLineItem', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   quotationId: { type: DataTypes.INTEGER, allowNull: false },
-  parameterId: { type: DataTypes.INTEGER, allowNull: true },
-  // defaultValue lets Postgres backfill this onto any pre-existing rows
-  // when the column is first added to a live database (without it, an
-  // ALTER TABLE ... NOT NULL on a table that already has rows fails
-  // outright, since Postgres has nothing to put in the new column for
-  // them). The app always sets a real value explicitly on every new row,
-  // so this default is really just a one-time migration safety net.
   sampleName: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
-  description: { type: DataTypes.TEXT, allowNull: false },
-  quantity: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 1 },
-  unitPriceCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
-  discountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  parametersText: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
+  sampleQty: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 1 },
+  chargesPerSampleCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  sampleCount: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 1 },
   lineTotalCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   sortOrder: { type: DataTypes.INTEGER, defaultValue: 0 },
 });

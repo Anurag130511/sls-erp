@@ -13,6 +13,7 @@ const Quotation = sequelize.define('Quotation', {
   },
   issueDate: { type: DataTypes.DATEONLY, allowNull: false },
   expiryDate: { type: DataTypes.DATEONLY },
+  subject: { type: DataTypes.STRING, allowNull: true }, // the "Sub." line on the quotation letter
   // createdById links to the live User record (nullable — if that user's
   // login is later removed, the FK goes null via onDelete: SET NULL, see
   // models/index.js). salesPersonName is a snapshot taken at creation
@@ -21,6 +22,7 @@ const Quotation = sequelize.define('Quotation', {
   createdById: { type: DataTypes.INTEGER, allowNull: true },
   salesPersonName: { type: DataTypes.STRING, allowNull: true },
   salesPersonDesignation: { type: DataTypes.STRING, allowNull: true },
+  salesPersonContactNo: { type: DataTypes.STRING, allowNull: true },
   subtotalCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   discountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   // GST is optional per quotation — gstApplicable toggles whether it's

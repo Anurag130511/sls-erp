@@ -7,6 +7,7 @@ const User = sequelize.define('User', {
   email: { type: DataTypes.STRING, allowNull: false, unique: true },
   passwordHash: { type: DataTypes.STRING, allowNull: false },
   designation: { type: DataTypes.STRING, allowNull: true }, // e.g. "Sales Executive", "Lab Manager"
+  contactNo: { type: DataTypes.STRING, allowNull: true }, // shown on quotations/POs they create
   role: {
     type: DataTypes.ENUM('admin', 'manager', 'viewer'),
     defaultValue: 'manager',

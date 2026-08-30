@@ -29,11 +29,11 @@ async function login(req, res) {
     if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email, role: user.role, designation: user.designation },
+      { id: user.id, name: user.name, email: user.email, role: user.role, designation: user.designation, contactNo: user.contactNo },
       process.env.JWT_SECRET,
       { expiresIn: '7d' } // long-lived since this is an internal team tool, not a public site
     );
-    return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, designation: user.designation } });
+    return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, designation: user.designation, contactNo: user.contactNo } });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

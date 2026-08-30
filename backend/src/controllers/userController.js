@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { User } = require('../models');
 
-const SAFE_ATTRS = ['id', 'name', 'email', 'designation', 'role', 'createdAt'];
+const SAFE_ATTRS = ['id', 'name', 'email', 'designation', 'contactNo', 'role', 'createdAt'];
 
 const list = async (req, res) => {
   const users = await User.findAll({ attributes: SAFE_ATTRS, order: [['name', 'ASC']] });
@@ -9,7 +9,7 @@ const list = async (req, res) => {
 };
 
 const create = async (req, res) => {
-  const { name, email, password, role, designation } = req.body;
+  const { name, email, password, role, designation, contactNo } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'name, email and password are required' });
   }
@@ -17,19 +17,20 @@ const create = async (req, res) => {
   if (existing) return res.status(409).json({ error: 'A user with that email already exists' });
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, passwordHash, role: role || 'manager', designation: designation || null });
-  res.status(201).json({ id: user.id, name: user.name, email: user.email, designation: user.designation, role: user.role });
+  const user = await User.create({ name, email, passwordHash, role: role || 'manager', designation: designation || null, contactNo: contactNo || null });
+  res.status(201).json({ id: user.id, name: user.name, email: user.email, designation: user.designation, contactNo: user.contactNo, role: user.role });
 };
 
 const update = async (req, res) => {
   const user = await User.findByPk(req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const { name, role, password, designation } = req.body;
+  const { name, role, password, designation, contactNo } = req.body;
   const patch = {};
   if (name) patch.name = name;
   if (role) patch.role = role;
   if (designation !== undefined) patch.designation = designation;
+  if (contactNo !== undefined) patch.contactNo = contactNo;
   if (password) patch.passwordHash = await bcrypt.hash(password, 10);
 
   // Don't allow demoting the last remaining admin — that would lock
@@ -42,7 +43,7 @@ const update = async (req, res) => {
   }
 
   await user.update(patch);
-  res.json({ id: user.id, name: user.name, email: user.email, designation: user.designation, role: user.role });
+  res.json({ id: user.id, name: user.name, email: user.email, designation: user.designation, contactNo: user.contactNo, role: user.role });
 };
 
 const remove = async (req, res) => {

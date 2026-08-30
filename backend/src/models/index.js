@@ -15,11 +15,12 @@ const GeneratedDocument = require('./GeneratedDocument');
 Quotation.belongsTo(Customer, { foreignKey: 'customerId', as: 'customer' });
 Customer.hasMany(Quotation, { foreignKey: 'customerId' });
 
-// Quotation <-> LineItems <-> Parameter (lab test parameters — separate
-// catalog from Item, which is what purchase orders buy from vendors).
+// Quotation <-> LineItems (one row per sample — see QuotationLineItem's
+// own comment). Parameter is still a standalone catalog (used by the
+// quotation form and auto-save-on-typing), but no longer FK-linked from
+// line items now that pricing/display is per-sample, not per-parameter.
 Quotation.hasMany(QuotationLineItem, { foreignKey: 'quotationId', as: 'lineItems', onDelete: 'CASCADE' });
 QuotationLineItem.belongsTo(Quotation, { foreignKey: 'quotationId' });
-QuotationLineItem.belongsTo(Parameter, { foreignKey: 'parameterId', as: 'parameter' });
 
 // PurchaseOrder <-> Vendor
 PurchaseOrder.belongsTo(Vendor, { foreignKey: 'vendorId', as: 'vendor' });

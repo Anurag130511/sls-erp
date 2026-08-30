@@ -1,13 +1,11 @@
-// One sample name entered once, with any number of parameters (each
-// picked from the catalog or typed freely) tested under it. "+ Add
-// Parameter" adds another row to the current sample; "+ Add Sample"
-// (rendered by the parent form, not here) starts a new one. Discount is
-// NOT per-parameter — it's a single field at the quotation level,
-// entered elsewhere in the form.
+// Matches the lab's real quotation format: one Sample Name, a list of
+// Parameters tested for it (name only — no per-parameter price), and a
+// single Charges/Sample rate multiplied by Sample Qty and Sample Count
+// to get that sample's line total. "+ Add Parameter" adds another
+// parameter to the list; "+ Add Sample" (rendered by the parent form)
+// starts a new sample block.
 export default function SampleParameterEditor({ sample, sampleIndex, onChange, onRemoveSample, catalogParameters, canRemoveSample }) {
-  const updateSampleName = (sampleName) => {
-    onChange({ ...sample, sampleName });
-  };
+  const updateField = (patch) => onChange({ ...sample, ...patch });
 
   const updateParameter = (paramIndex, patch) => {
     const nextParameters = [...sample.parameters];
@@ -16,10 +14,7 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
   };
 
   const addParameter = () => {
-    onChange({
-      ...sample,
-      parameters: [...sample.parameters, { parameterId: null, description: '', unitPrice: '' }],
-    });
+    onChange({ ...sample, parameters: [...sample.parameters, { parameterId: null, description: '' }] });
   };
 
   const removeParameter = (paramIndex) => {
@@ -32,17 +27,10 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
       updateParameter(paramIndex, { parameterId: null });
       return;
     }
-    updateParameter(paramIndex, {
-      parameterId: entry.id,
-      description: entry.name,
-      unitPrice: (entry.unitPriceCents / 100).toString(),
-    });
+    updateParameter(paramIndex, { parameterId: entry.id, description: entry.name });
   };
 
-  const sampleTotal = sample.parameters.reduce(
-    (sum, p) => sum + Number(p.unitPrice || 0),
-    0
-  );
+  const lineTotal = Number(sample.chargesPerSample || 0) * Number(sample.sampleQty || 1) * Number(sample.sampleCount || 1);
 
   return (
     <div className="card" style={{ marginBottom: 16, background: '#FAFBF8' }}>
@@ -52,7 +40,7 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
           <input
             required
             value={sample.sampleName}
-            onChange={(e) => updateSampleName(e.target.value)}
+            onChange={(e) => updateField({ sampleName: e.target.value })}
             placeholder={`e.g. Water Sample ${sampleIndex + 1}`}
           />
         </div>
@@ -61,12 +49,12 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
         )}
       </div>
 
-      <table className="line-items-table">
+      <label style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, display: 'block' }}>Parameters</label>
+      <table className="line-items-table" style={{ marginBottom: 10 }}>
         <thead>
           <tr>
-            <th style={{ width: '30%' }}>Parameter (optional)</th>
+            <th style={{ width: '30%' }}>From catalog (optional)</th>
             <th>Parameter Name</th>
-            <th style={{ width: 120 }}>Price (₹)</th>
             <th style={{ width: 40 }}></th>
           </tr>
         </thead>
@@ -90,13 +78,6 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
                 />
               </td>
               <td>
-                <input
-                  type="number" min="0" step="0.01" required
-                  value={param.unitPrice}
-                  onChange={(e) => updateParameter(paramIndex, { unitPrice: e.target.value })}
-                />
-              </td>
-              <td>
                 {sample.parameters.length > 1 && (
                   <button type="button" className="btn danger" style={{ padding: '4px 8px' }} onClick={() => removeParameter(paramIndex)}>×</button>
                 )}
@@ -105,12 +86,37 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
           ))}
         </tbody>
       </table>
+      <button type="button" className="btn secondary" onClick={addParameter} style={{ marginBottom: 14 }}>+ Add Parameter</button>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-        <button type="button" className="btn secondary" onClick={addParameter}>+ Add Parameter</button>
-        <div style={{ fontSize: 13, color: '#666' }}>
-          Sample total: <strong>₹{sampleTotal.toFixed(2)}</strong>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Sample Qty. *</label>
+          <input
+            type="number" min="0" step="1" required
+            value={sample.sampleQty}
+            onChange={(e) => updateField({ sampleQty: e.target.value })}
+          />
         </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Charges/Sample (₹) *</label>
+          <input
+            type="number" min="0" step="0.01" required
+            value={sample.chargesPerSample}
+            onChange={(e) => updateField({ chargesPerSample: e.target.value })}
+          />
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label>Sample Count *</label>
+          <input
+            type="number" min="0" step="1" required
+            value={sample.sampleCount}
+            onChange={(e) => updateField({ sampleCount: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'right', marginTop: 10, fontSize: 13, color: '#666' }}>
+        Sample total: <strong>₹{lineTotal.toFixed(2)}</strong>
       </div>
     </div>
   );

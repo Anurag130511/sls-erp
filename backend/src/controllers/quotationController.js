@@ -6,53 +6,53 @@ const { toCents } = require('../utils/money');
 const INCLUDE = [
   { model: Customer, as: 'customer' },
   { model: QuotationLineItem, as: 'lineItems' },
-  { model: User, as: 'createdBy', attributes: ['id', 'name', 'email', 'designation'] },
+  { model: User, as: 'createdBy', attributes: ['id', 'name', 'email', 'designation', 'contactNo'] },
 ];
 
 /**
- * Flattens the nested samples->parameters structure the form sends into
- * QuotationLineItem rows, and — for any parameter typed freely rather
- * than picked from the catalog — creates it in the Parameter catalog so
- * it's available to pick next time. Matching is by exact name (case-
- * insensitive) so re-typing an existing parameter's name reuses it
- * instead of creating a duplicate.
+ * Converts the samples the form sends into one QuotationLineItem row per
+ * sample (matching the lab's real quotation format — pricing is always
+ * per-sample: Charges/Sample x Sample Qty x Sample Count). Every named
+ * parameter (typed or picked from the catalog) is auto-saved to the
+ * Parameter catalog if it doesn't already exist there — matching is by
+ * exact name (case-insensitive) so re-typing an existing one reuses it
+ * instead of creating a duplicate — even though pricing itself no longer
+ * lives on individual parameters.
  */
-async function flattenSamplesAndSaveNewParameters(samples, t) {
+async function buildLinesAndSaveNewParameters(samples, t) {
   const lines = [];
   let sortOrder = 0;
 
   for (const sample of samples) {
     const sampleName = (sample.sampleName || '').trim();
-    for (const param of sample.parameters) {
-      const description = (param.description || '').trim();
-      const unitPriceCents = toCents(param.unitPrice || 0);
-      let parameterId = param.parameterId || null;
+    const parameterNames = (sample.parameters || [])
+      .map((p) => (p.description || '').trim())
+      .filter(Boolean);
 
-      if (!parameterId && description) {
-        let existing = await Parameter.findOne({
-          where: sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), description.toLowerCase()),
-          transaction: t,
-        });
-        if (!existing) {
-          existing = await Parameter.create(
-            { name: description, unitPriceCents, unit: 'test' },
-            { transaction: t }
-          );
-        }
-        parameterId = existing.id;
-      }
-
-      lines.push({
-        parameterId,
-        sampleName,
-        description,
-        quantity: 1,
-        unitPriceCents,
-        discountCents: 0,
-        lineTotalCents: unitPriceCents,
-        sortOrder: sortOrder++,
+    for (const name of parameterNames) {
+      const existing = await Parameter.findOne({
+        where: sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), name.toLowerCase()),
+        transaction: t,
       });
+      if (!existing) {
+        await Parameter.create({ name, unitPriceCents: 0, unit: 'test' }, { transaction: t });
+      }
     }
+
+    const sampleQty = Number(sample.sampleQty || 1);
+    const chargesPerSampleCents = toCents(sample.chargesPerSample || 0);
+    const sampleCount = Number(sample.sampleCount || 1);
+    const lineTotalCents = Math.round(chargesPerSampleCents * sampleQty * sampleCount);
+
+    lines.push({
+      sampleName,
+      parametersText: parameterNames.join(', '),
+      sampleQty,
+      chargesPerSampleCents,
+      sampleCount,
+      lineTotalCents,
+      sortOrder: sortOrder++,
+    });
   }
 
   return lines;
@@ -83,7 +83,7 @@ const get = async (req, res) => {
 };
 
 const create = async (req, res) => {
-  const { customerId, issueDate, expiryDate, notes, terms, samples, discount, gstApplicable, gstPercent } = req.body;
+  const { customerId, issueDate, expiryDate, subject, notes, terms, samples, discount, gstApplicable, gstPercent } = req.body;
 
   if (!customerId || !issueDate || !Array.isArray(samples) || samples.length === 0) {
     return res.status(400).json({ error: 'customerId, issueDate and at least one sample are required' });
@@ -96,10 +96,14 @@ const create = async (req, res) => {
 
   const result = await sequelize.transaction(async (t) => {
     const quotationNumber = await nextQuotationNumber();
-    const lines = await flattenSamplesAndSaveNewParameters(samples, t);
+    const lines = await buildLinesAndSaveNewParameters(samples, t);
     const discountCents = toCents(discount || 0);
+    // GST defaults to on — this lab charges it on essentially every
+    // quotation, so the form starts checked rather than requiring an
+    // opt-in each time (still toggleable for the rare exempt customer).
+    const gstOn = gstApplicable !== undefined ? Boolean(gstApplicable) : true;
     const { subtotalCents, gstCents, totalCents } = computeTotalsFromLines(
-      lines, discountCents, Boolean(gstApplicable), gstPercent || 18
+      lines, discountCents, gstOn, gstPercent || 18
     );
 
     const quotation = await Quotation.create(
@@ -108,18 +112,20 @@ const create = async (req, res) => {
         customerId,
         issueDate,
         expiryDate,
+        subject: subject || null,
         notes,
         terms,
         status: 'draft',
         subtotalCents,
         discountCents,
-        gstApplicable: Boolean(gstApplicable),
+        gstApplicable: gstOn,
         gstPercent: gstPercent || 18,
         gstCents,
         totalCents,
         createdById: req.user.id,
         salesPersonName: req.user.name,
         salesPersonDesignation: req.user.designation || null,
+        salesPersonContactNo: req.user.contactNo || null,
       },
       { transaction: t }
     );
@@ -145,16 +151,17 @@ const update = async (req, res) => {
     return res.status(400).json({ error: `Cannot edit a quotation in "${quotation.status}" status` });
   }
 
-  const { customerId, issueDate, expiryDate, notes, terms, samples, discount, gstApplicable, gstPercent } = req.body;
+  const { customerId, issueDate, expiryDate, subject, notes, terms, samples, discount, gstApplicable, gstPercent } = req.body;
 
   await sequelize.transaction(async (t) => {
     const patch = { customerId, issueDate, expiryDate, notes, terms };
+    if (subject !== undefined) patch.subject = subject;
     const nextGstApplicable = gstApplicable !== undefined ? Boolean(gstApplicable) : quotation.gstApplicable;
     const nextGstPercent = gstPercent !== undefined ? gstPercent : quotation.gstPercent;
     const nextDiscountCents = discount !== undefined ? toCents(discount) : quotation.discountCents;
 
     if (Array.isArray(samples) && samples.length > 0) {
-      const lines = await flattenSamplesAndSaveNewParameters(samples, t);
+      const lines = await buildLinesAndSaveNewParameters(samples, t);
       const { subtotalCents, gstCents, totalCents } = computeTotalsFromLines(
         lines, nextDiscountCents, nextGstApplicable, nextGstPercent
       );

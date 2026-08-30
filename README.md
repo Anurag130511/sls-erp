@@ -368,47 +368,88 @@ you've already generated) — Reports produces spreadsheet-format data
 across many documents at once, for bookkeeping/analysis rather than
 sending a single document to a customer or vendor.
 
-## Parameters, GST, and user designations (lab-specific)
+## Quotation format (matches this lab's real letterhead)
 
-Quotations are built around **Samples**, each containing one or more
-**Parameters** — matching how this lab actually quotes: a customer
-sends samples, and each sample gets tested for a set of parameters.
+The quotation PDF and detail page are built to match this business's
+actual quotation format exactly — letterhead, customer letter block,
+sample/parameter table, totals, terms, and footer.
 
-- Enter a **Sample Name** once per sample (e.g. "Borewell Water — Site A").
-- Under it, **"+ Add Parameter"** adds another test to that same sample
-  — no need to re-type the sample name for each one.
-- **"+ Add Sample"** starts a new sample block, for quoting multiple
+**Samples & Parameters** (matches the "Sample Name / Parameters / Sample
+Qty. / Charges per Sample / Sample count / Total" columns of the real
+format — pricing is always per-sample here, never per-parameter):
+
+- Enter a **Sample Name** once per sample.
+- Add one or more **Parameters** under it — pick from the catalog or
+  type a new one freely. **Typing a new parameter automatically saves
+  it to the Parameters catalog** (matched by name, so retyping an
+  existing one reuses it instead of duplicating) — so next time it's
+  available to pick from the dropdown.
+- Set **Sample Qty.**, **Charges/Sample**, and **Sample Count** — the
+  line total is Charges/Sample × Sample Qty. × Sample Count, matching
+  the real form's columns exactly.
+- **"+ Add Sample"** starts a new sample block for quoting several
   samples in one quotation.
-- Each parameter can be picked from the **Parameters** catalog
-  (auto-fills its price) or typed completely freely. **Typing a new one
-  automatically saves it to the Parameters catalog** — so the next
-  quotation can pick it from the dropdown instead of retyping it. Matching
-  is by name, so retyping an existing parameter's name reuses it rather
-  than creating a duplicate.
-- **Discount is a single field for the whole quotation** (not per
-  parameter) — enter it once near the bottom of the form, and it comes
-  off the subtotal before GST is calculated.
 - Manage the Parameters catalog directly at **Parameters** in the
-  sidebar too: add one at a time, or bulk-upload a spreadsheet (same
-  pattern as Customers/Vendors — download the template first for exact
-  column names).
+  sidebar: add one at a time, or bulk-upload a spreadsheet.
 - **Items** (materials/reagents bought from vendors on Purchase Orders)
-  is a separate, unchanged catalog — no longer in the sidebar nav since
-  day-to-day work here is quotation-focused, but still reachable at
-  `/items` if you need to manage it, and Purchase Orders still use it
-  exactly as before.
+  is a separate, unchanged catalog — not in the sidebar nav day-to-day,
+  but still reachable at `/items`, and Purchase Orders use it exactly
+  as before.
 
-**GST**: quotations have an "Include GST (18%)" checkbox. Leave it
-unchecked for a GST-exclusive quote, or check it to add 18% to the
-post-discount total automatically — shown as its own line on both the
-quotation detail page and the PDF, which now also groups line items
-under their sample name to match how you entered them.
+**Discount** is a single field for the whole quotation (not per sample)
+— enter it once near the bottom of the form.
 
-**User designations**: when creating a user (Users page, admin only),
-you can set a designation (e.g. "Sales Executive," "Lab Manager")
-alongside their name. This shows on quotations/POs they create — e.g.
-"Sales Person: Priya Sharma — Sales Executive." Click a user's
-designation in the table to edit it later.
+**GST** defaults to *on* at 18% (matching this lab's standard practice
+of always charging it) — shown as its own line in the totals and on the
+PDF. Uncheck "Include GST" for the rare exempt/exclusive quote.
+
+**Subject line**: quotations have an optional "Sub." field, shown on
+the letter exactly like the real format.
+
+### Matching the letterhead exactly
+
+The quotation PDF's company details, NABL accreditation line, PAN, bank
+details, and footer address all come from `QUOTE_ORG_*` environment
+variables — separate from the `ORG_*` ones Purchase Orders use, since
+this business's letterhead address differs from its PO "Ship To"
+address. `backend/.env.example` has all of them pre-filled with the
+values from the reference document, including bank details for the
+"Payment Should be advanced through RTGS/NEFT" terms line — update them
+there (or in your host's environment variables once deployed) if any of
+these details ever change.
+
+## User designations & contact details
+
+When creating a user (Users page, admin only), you can set:
+- **Designation** (e.g. "Sales Executive," "Lab Manager")
+- **Contact No.**
+
+Both show on quotations/POs they create — the quotation PDF's sign-off
+block ("Warm regards, ... Mob: ...") uses the creator's name and contact
+number automatically, matching the real format. Click a user's
+designation or contact number in the Users table to edit it later.
+
+## PDF generation on Render: "Could not find Chrome"
+
+If you deployed the backend to Render and PDF downloads fail with a
+"Could not find Chrome" error, this is a known Render + Puppeteer
+interaction: Chrome gets downloaded during the build step to a system
+cache path that doesn't always carry over into the running service.
+
+This project already includes the standard fix (`backend/.puppeteerrc.cjs`,
+which pins Chrome's download location inside the project folder so it's
+guaranteed to survive the build-to-runtime handoff) — if you're
+redeploying with the latest code, this should already be resolved.
+
+If it still happens, add this as an extra safety net: on Render, go to
+your backend service → **Settings** → change the **Build Command** from
+`npm install` to:
+```
+npm install && npx puppeteer browsers install chrome
+```
+This forces Chrome to (re-)install on every build, regardless of
+whether Render's dependency cache skipped it.
+
 
 ### 3. Try it out
 
