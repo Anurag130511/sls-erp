@@ -97,6 +97,29 @@ async function ensureBootstrapAdmin() {
   console.log(`Bootstrap admin account created: ${email}`);
 }
 
+// Checks Chrome is actually where Puppeteer expects it at startup, so a
+// missing browser shows up immediately in the deploy logs — not only
+// later, as a confusing error the first time someone downloads a PDF.
+function checkChromeInstalled() {
+  try {
+    const fs = require('fs');
+    const puppeteer = require('puppeteer');
+    const execPath = puppeteer.executablePath();
+    if (fs.existsSync(execPath)) {
+      console.log(`Chrome found for PDF generation: ${execPath}`);
+    } else {
+      console.warn(
+        `\nWARNING: Chrome not found at ${execPath} — PDF downloads will fail.\n` +
+        'This is normally installed automatically by the "postinstall" script in ' +
+        'backend/package.json during "npm install". If it\'s still missing, try ' +
+        'redeploying, or manually run: npx puppeteer browsers install chrome\n'
+      );
+    }
+  } catch (err) {
+    console.warn('Could not verify Chrome installation:', err.message);
+  }
+}
+
 async function start() {
   // alter: true lets Sequelize add new columns (like the salesperson
   // tracking added in this update) to an existing database automatically,
@@ -105,6 +128,7 @@ async function start() {
   // Sequelize, back up backend/data/database.sqlite first.
   await sequelize.sync({ alter: true });
   await ensureBootstrapAdmin();
+  checkChromeInstalled();
   app.listen(PORT, HOST, () => {
     console.log(`Invoicing API listening on http://localhost:${PORT} (and on your LAN IP)`);
   });
