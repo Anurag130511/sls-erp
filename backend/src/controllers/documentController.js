@@ -5,6 +5,7 @@ const {
 } = require('../models');
 const { generateQuotationPdf, generatePurchaseOrderPdf } = require('../services/pdfService');
 const storage = require('../services/storageService');
+const { isOwnerOrAdmin } = require('../utils/ownership');
 
 // Regenerating a PDF for the same document overwrites the same storage
 // key and updates the existing GeneratedDocument row (rather than piling
@@ -14,14 +15,18 @@ function keyFor(docType, documentNumber) {
   return `${docType}-${safe}.pdf`;
 }
 
-async function getOrCreateQuotationPdf(quotationId) {
+// Returns null both when the quotation doesn't exist AND when the
+// requester isn't allowed to see it — the route then reports a plain
+// 404 either way, so a non-admin can't tell the difference between "no
+// such quotation" and "exists, but isn't yours."
+async function getOrCreateQuotationPdf(quotationId, req) {
   const quotation = await Quotation.findByPk(quotationId, {
     include: [
       { model: Customer, as: 'customer' },
       { model: QuotationLineItem, as: 'lineItems' },
     ],
   });
-  if (!quotation) return null;
+  if (!quotation || !isOwnerOrAdmin(quotation, req)) return null;
 
   const key = keyFor('quotation', quotation.quotationNumber);
   const buffer = await generateQuotationPdf(quotation);
@@ -32,6 +37,7 @@ async function getOrCreateQuotationPdf(quotationId) {
     documentId: quotation.id,
     documentNumber: quotation.quotationNumber,
     partyName: quotation.customer?.name || null,
+    createdById: quotation.createdById,
     storageKey: key,
     fileSizeBytes: buffer.length,
   }, { conflictFields: ['docType', 'documentId'] });
@@ -39,14 +45,14 @@ async function getOrCreateQuotationPdf(quotationId) {
   return { buffer, filename: `${quotation.quotationNumber.replace(/\//g, '-')}.pdf` };
 }
 
-async function getOrCreatePurchaseOrderPdf(poId) {
+async function getOrCreatePurchaseOrderPdf(poId, req) {
   const po = await PurchaseOrder.findByPk(poId, {
     include: [
       { model: Vendor, as: 'vendor' },
       { model: POLineItem, as: 'lineItems' },
     ],
   });
-  if (!po) return null;
+  if (!po || !isOwnerOrAdmin(po, req)) return null;
 
   const key = keyFor('purchase_order', po.poNumber);
   const buffer = await generatePurchaseOrderPdf(po);
@@ -57,6 +63,7 @@ async function getOrCreatePurchaseOrderPdf(poId) {
     documentId: po.id,
     documentNumber: po.poNumber,
     partyName: po.vendor?.name || null,
+    createdById: po.createdById,
     storageKey: key,
     fileSizeBytes: buffer.length,
   }, { conflictFields: ['docType', 'documentId'] });
@@ -64,9 +71,12 @@ async function getOrCreatePurchaseOrderPdf(poId) {
   return { buffer, filename: `${po.poNumber.replace(/\//g, '-')}.pdf` };
 }
 
-// GET /api/documents — the document library, newest first.
+// GET /api/documents — the document library, newest first. Non-admins
+// only see documents generated from their own quotations/POs.
 const listDocuments = async (req, res) => {
-  const docs = await GeneratedDocument.findAll({ order: [['updatedAt', 'DESC']] });
+  const where = {};
+  if (req.user.role !== 'admin') where.createdById = req.user.id;
+  const docs = await GeneratedDocument.findAll({ where, order: [['updatedAt', 'DESC']] });
   res.json(docs);
 };
 
@@ -74,7 +84,9 @@ const listDocuments = async (req, res) => {
 // PDF from storage without regenerating it.
 const downloadDocument = async (req, res) => {
   const doc = await GeneratedDocument.findByPk(req.params.id);
-  if (!doc) return res.status(404).json({ error: 'Document not found' });
+  if (!doc || (req.user.role !== 'admin' && doc.createdById !== req.user.id)) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
 
   const buffer = await storage.read(doc.storageKey);
   if (!buffer) return res.status(404).json({ error: 'Stored file is missing — try regenerating it from the document page.' });

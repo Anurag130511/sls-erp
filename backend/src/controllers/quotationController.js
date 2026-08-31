@@ -2,6 +2,7 @@ const { sequelize, Quotation, QuotationLineItem, Customer, User, Parameter } = r
 const { nextQuotationNumber } = require('../utils/numbering');
 const { canTransitionQuotation } = require('../utils/statusTransitions');
 const { toCents } = require('../utils/money');
+const { scopeToOwnerUnlessAdmin, isOwnerOrAdmin } = require('../utils/ownership');
 
 const INCLUDE = [
   { model: Customer, as: 'customer' },
@@ -17,13 +18,14 @@ const INCLUDE = [
  * exact name (case-insensitive) so re-typing an existing one reuses it
  * instead of creating a duplicate.
  *
- * Each sample chooses individual or combined pricing:
- *  - Individual: every parameter row has its own charge; Total = that
- *    charge x sampleQty x sampleCount, shown separately per row.
- *  - Combined: one charge for the whole sample lands on its first
- *    parameter row (chargesPerSampleCents on the rest is 0); the
- *    detail page/PDF render that as a single merged cell spanning every
- *    parameter row in the group instead of repeating/blanking it.
+ * Within a sample, each parameter can either stand alone (its own
+ * price) or be marked "combine with previous" to join the pricing group
+ * of the parameter directly above it — chaining lets 3+ parameters
+ * share one combined price. This means a single sample can freely mix
+ * individually-priced parameters with combined-price groups. A group's
+ * charge lands on its first parameter row (chargesPerSampleCents on the
+ * rest of that group is 0); the detail page/PDF render that as a single
+ * merged cell spanning every row in the group instead of repeating it.
  */
 async function buildLinesAndSaveNewParameters(samples, t) {
   const lines = [];
@@ -34,39 +36,59 @@ async function buildLinesAndSaveNewParameters(samples, t) {
     const sampleName = (sample.sampleName || '').trim();
     const sampleQty = Number(sample.sampleQty || 1);
     const sampleCount = Number(sample.sampleCount || 1);
-    const isCombinedPricing = Boolean(sample.combinedPricing);
-    const combinedChargeCents = isCombinedPricing ? toCents(sample.combinedPrice || 0) : 0;
 
+    // Split this sample's parameters into pricing groups: a new group
+    // starts at index 0 or whenever a parameter is NOT marked to combine
+    // with the previous one; combineWithPrevious chains it onto the
+    // current group instead.
+    const groups = [];
     for (let i = 0; i < sample.parameters.length; i++) {
       const param = sample.parameters[i];
-      const parameterName = (param.description || '').trim();
-
-      if (parameterName) {
-        const existing = await Parameter.findOne({
-          where: sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), parameterName.toLowerCase()),
-          transaction: t,
-        });
-        if (!existing) {
-          await Parameter.create({ name: parameterName, unitPriceCents: 0, unit: 'test' }, { transaction: t });
-        }
+      if (i === 0 || !param.combineWithPrevious) {
+        groups.push([param]);
+      } else {
+        groups[groups.length - 1].push(param);
       }
+    }
 
-      const chargesPerSampleCents = isCombinedPricing
-        ? (i === 0 ? combinedChargeCents : 0)
-        : toCents(param.charges || 0);
-      const lineTotalCents = Math.round(chargesPerSampleCents * sampleQty * sampleCount);
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
+      const group = groups[groupIndex];
+      const isCombinedPricing = group.length > 1;
+      // The group's price is always entered on its first (root) member —
+      // members added via "combine with previous" don't get their own
+      // price field in the UI, so their own `charges` value is ignored.
+      const groupChargeCents = toCents(group[0].charges || 0);
 
-      lines.push({
-        sampleName,
-        sampleIndex,
-        parameterName,
-        sampleQty,
-        sampleCount,
-        isCombinedPricing,
-        chargesPerSampleCents,
-        lineTotalCents,
-        sortOrder: sortOrder++,
-      });
+      for (let j = 0; j < group.length; j++) {
+        const param = group[j];
+        const parameterName = (param.description || '').trim();
+
+        if (parameterName) {
+          const existing = await Parameter.findOne({
+            where: sequelize.where(sequelize.fn('LOWER', sequelize.col('name')), parameterName.toLowerCase()),
+            transaction: t,
+          });
+          if (!existing) {
+            await Parameter.create({ name: parameterName, unitPriceCents: 0, unit: 'test' }, { transaction: t });
+          }
+        }
+
+        const chargesPerSampleCents = j === 0 ? groupChargeCents : 0;
+        const lineTotalCents = Math.round(chargesPerSampleCents * sampleQty * sampleCount);
+
+        lines.push({
+          sampleName,
+          sampleIndex,
+          pricingGroupIndex: groupIndex,
+          parameterName,
+          sampleQty,
+          sampleCount,
+          isCombinedPricing,
+          chargesPerSampleCents,
+          lineTotalCents,
+          sortOrder: sortOrder++,
+        });
+      }
     }
   }
 
@@ -86,14 +108,23 @@ const list = async (req, res) => {
   const where = {};
   if (status) where.status = status;
   if (customerId) where.customerId = customerId;
-  if (userId) where.createdById = userId;
+  // Admins can optionally filter to one salesperson (e.g. from Reports);
+  // non-admins are always scoped to their own records regardless of
+  // what's in the query string.
+  if (req.user.role === 'admin') {
+    if (userId) where.createdById = userId;
+  } else {
+    where.createdById = req.user.id;
+  }
   const quotations = await Quotation.findAll({ where, include: INCLUDE, order: [['issueDate', 'DESC']] });
   res.json(quotations);
 };
 
 const get = async (req, res) => {
   const quotation = await Quotation.findByPk(req.params.id, { include: INCLUDE });
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
+  if (!quotation || !isOwnerOrAdmin(quotation, req)) {
+    return res.status(404).json({ error: 'Quotation not found' });
+  }
   res.json(quotation);
 };
 
@@ -161,7 +192,9 @@ const create = async (req, res) => {
 // customers may be holding a copy, so the document should not silently change.
 const update = async (req, res) => {
   const quotation = await Quotation.findByPk(req.params.id);
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
+  if (!quotation || !isOwnerOrAdmin(quotation, req)) {
+    return res.status(404).json({ error: 'Quotation not found' });
+  }
   if (quotation.status !== 'draft') {
     return res.status(400).json({ error: `Cannot edit a quotation in "${quotation.status}" status` });
   }
@@ -219,7 +252,9 @@ const update = async (req, res) => {
 
 const setStatus = async (req, res) => {
   const quotation = await Quotation.findByPk(req.params.id);
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
+  if (!quotation || !isOwnerOrAdmin(quotation, req)) {
+    return res.status(404).json({ error: 'Quotation not found' });
+  }
 
   const { status } = req.body;
   if (!canTransitionQuotation(quotation.status, status)) {
@@ -231,7 +266,9 @@ const setStatus = async (req, res) => {
 
 const remove = async (req, res) => {
   const quotation = await Quotation.findByPk(req.params.id);
-  if (!quotation) return res.status(404).json({ error: 'Quotation not found' });
+  if (!quotation || !isOwnerOrAdmin(quotation, req)) {
+    return res.status(404).json({ error: 'Quotation not found' });
+  }
   if (quotation.status !== 'draft') {
     return res.status(400).json({ error: 'Only draft quotations can be deleted' });
   }

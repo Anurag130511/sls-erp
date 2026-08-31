@@ -10,6 +10,10 @@ const GeneratedDocument = sequelize.define('GeneratedDocument', {
   documentId: { type: DataTypes.INTEGER, allowNull: false }, // FK to Quotation.id or PurchaseOrder.id
   documentNumber: { type: DataTypes.STRING, allowNull: false },
   partyName: { type: DataTypes.STRING }, // customer or vendor name, snapshotted for the list view
+  // Snapshotted from the underlying Quotation/PO's creator, so the
+  // Documents library can be scoped to "just mine" for non-admins the
+  // same way the Quotations/Purchase Orders lists are.
+  createdById: { type: DataTypes.INTEGER, allowNull: true },
   storageKey: { type: DataTypes.STRING, allowNull: false },
   fileSizeBytes: { type: DataTypes.INTEGER },
 }, {

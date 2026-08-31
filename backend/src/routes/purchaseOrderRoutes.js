@@ -15,7 +15,7 @@ router.delete('/:id', ctrl.remove);
 
 router.get('/:id/pdf', async (req, res) => {
   try {
-    const result = await getOrCreatePurchaseOrderPdf(req.params.id);
+    const result = await getOrCreatePurchaseOrderPdf(req.params.id, req);
     if (!result) return res.status(404).json({ error: 'Purchase order not found' });
 
     res.set({

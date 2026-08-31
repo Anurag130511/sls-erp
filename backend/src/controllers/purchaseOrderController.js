@@ -2,6 +2,7 @@ const { sequelize, PurchaseOrder, POLineItem, Vendor, Quotation, User } = requir
 const { nextPONumber } = require('../utils/numbering');
 const { canTransitionPO } = require('../utils/statusTransitions');
 const { toCents } = require('../utils/money');
+const { scopeToOwnerUnlessAdmin, isOwnerOrAdmin } = require('../utils/ownership');
 
 const INCLUDE = [
   { model: Vendor, as: 'vendor' },
@@ -36,14 +37,20 @@ const list = async (req, res) => {
   const where = {};
   if (status) where.status = status;
   if (vendorId) where.vendorId = vendorId;
-  if (userId) where.createdById = userId;
+  if (req.user.role === 'admin') {
+    if (userId) where.createdById = userId;
+  } else {
+    where.createdById = req.user.id;
+  }
   const pos = await PurchaseOrder.findAll({ where, include: INCLUDE, order: [['issueDate', 'DESC']] });
   res.json(pos);
 };
 
 const get = async (req, res) => {
   const po = await PurchaseOrder.findByPk(req.params.id, { include: INCLUDE });
-  if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+  if (!po || !isOwnerOrAdmin(po, req)) {
+    return res.status(404).json({ error: 'Purchase order not found' });
+  }
   res.json(po);
 };
 
@@ -92,7 +99,9 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   const po = await PurchaseOrder.findByPk(req.params.id);
-  if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+  if (!po || !isOwnerOrAdmin(po, req)) {
+    return res.status(404).json({ error: 'Purchase order not found' });
+  }
   if (po.status !== 'draft') {
     return res.status(400).json({ error: `Cannot edit a purchase order in "${po.status}" status` });
   }
@@ -122,7 +131,9 @@ const update = async (req, res) => {
 
 const setStatus = async (req, res) => {
   const po = await PurchaseOrder.findByPk(req.params.id);
-  if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+  if (!po || !isOwnerOrAdmin(po, req)) {
+    return res.status(404).json({ error: 'Purchase order not found' });
+  }
 
   const { status } = req.body;
   if (!canTransitionPO(po.status, status)) {
@@ -136,7 +147,9 @@ const setStatus = async (req, res) => {
 // status to partially_received or received based on total quantities.
 const receiveItems = async (req, res) => {
   const po = await PurchaseOrder.findByPk(req.params.id, { include: INCLUDE });
-  if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+  if (!po || !isOwnerOrAdmin(po, req)) {
+    return res.status(404).json({ error: 'Purchase order not found' });
+  }
 
   const { receipts } = req.body; // [{ lineItemId, quantityReceived }]
   if (!Array.isArray(receipts) || receipts.length === 0) {
@@ -166,7 +179,9 @@ const receiveItems = async (req, res) => {
 
 const remove = async (req, res) => {
   const po = await PurchaseOrder.findByPk(req.params.id);
-  if (!po) return res.status(404).json({ error: 'Purchase order not found' });
+  if (!po || !isOwnerOrAdmin(po, req)) {
+    return res.status(404).json({ error: 'Purchase order not found' });
+  }
   if (po.status !== 'draft') {
     return res.status(400).json({ error: 'Only draft purchase orders can be deleted' });
   }

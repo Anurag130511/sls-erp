@@ -418,6 +418,29 @@ values from the reference document, including bank details for the
 there (or in your host's environment variables once deployed) if any of
 these details ever change.
 
+## Who can see what
+
+**Admins** see every quotation, purchase order, and generated PDF —
+across all users. **Managers and viewers** only see the ones they
+created themselves; a quotation someone else made won't appear in
+their list, and won't open even by direct link. The admin-only
+**Reports** page still lets an admin pull everyone's data, or filter to
+one person, regardless of this.
+
+## Mixing pricing within one sample
+
+A sample's parameters don't all have to be priced the same way. By
+default, every parameter you add gets its own **Charges** field. Check
+**"Combine with above"** on any parameter (after the first) to fold it
+into the same price as the parameter directly above it instead — check
+it on several in a row to group 3 or more together under one shared
+price. This means a single sample can freely mix individually-priced
+parameters with one or more combined-price groups, all at once — e.g.
+"256 pesticides" priced on its own, while "physical & Chemical" and
+"Heavy metals" share one combined price, all under the same sample. The
+detail page and PDF automatically show grouped parameters under one
+merged price cell, and individually-priced ones with their own.
+
 ## User designations & contact details
 
 When creating a user (Users page, admin only), you can set:

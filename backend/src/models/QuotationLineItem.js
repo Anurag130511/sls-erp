@@ -2,15 +2,19 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
 // One row per PARAMETER (each gets its own Sr. No. in the PDF/detail
-// table), grouped by sampleName. sampleQty/sampleCount/isCombinedPricing
-// are the same across every row in a sample's group — they're sample-
-// level facts, just repeated on each row here since there's no separate
-// Sample table. In combined-pricing mode, the whole sample's charge
-// lands on the first parameter row (chargesPerSampleCents on the rest is
-// 0) and the PDF/detail page render that as one merged cell spanning
-// the group; in individual mode, every row has its own charge and is
-// shown separately. Every field has a defaultValue so adding this shape
-// to a live database never fails on rows that predate it.
+// table). sampleIndex groups rows into samples; pricingGroupIndex
+// further groups rows WITHIN a sample into price blocks — a sample can
+// mix individually-priced parameters with parameters that share one
+// combined price, all at once (e.g. "256 pesticides" priced on its own,
+// while "physical & Chemical" and "Heavy metals" share one combined
+// price, all under the same "rice" sample). sampleQty/sampleCount are
+// sample-level facts (same across every row in a sample); a pricing
+// group's charge lands on its first row (chargesPerSampleCents on the
+// rest of that group is 0), and isCombinedPricing flags whether that
+// group has more than one parameter, telling the PDF/detail page to
+// render it as one merged cell spanning the group vs. a normal single
+// row. Every field has a defaultValue so adding this shape to a live
+// database never fails on rows that predate it.
 const QuotationLineItem = sequelize.define('QuotationLineItem', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   quotationId: { type: DataTypes.INTEGER, allowNull: false },
@@ -20,6 +24,10 @@ const QuotationLineItem = sequelize.define('QuotationLineItem', {
   // samples that happen to share the same name are never merged
   // together by mistake.
   sampleIndex: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  // Which price group (0, 1, 2...) within its sample this row belongs
+  // to — several consecutive parameters can share one pricing group
+  // (combined price) while others in the same sample stand alone.
+  pricingGroupIndex: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   parameterName: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
   sampleQty: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 1 },
   sampleCount: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 1 },

@@ -14,7 +14,7 @@ router.delete('/:id', ctrl.remove);
 
 router.get('/:id/pdf', async (req, res) => {
   try {
-    const result = await getOrCreateQuotationPdf(req.params.id);
+    const result = await getOrCreateQuotationPdf(req.params.id, req);
     if (!result) return res.status(404).json({ error: 'Quotation not found' });
 
     res.set({

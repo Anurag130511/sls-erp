@@ -6,11 +6,9 @@ import SampleParameterEditor from '../components/SampleParameterEditor';
 
 const emptySample = () => ({
   sampleName: '',
-  parameters: [{ parameterId: null, description: '', charges: '' }],
+  parameters: [{ parameterId: null, description: '', charges: '', combineWithPrevious: false }],
   sampleQty: 1,
   sampleCount: 1,
-  combinedPricing: false,
-  combinedPrice: '',
 });
 
 export default function QuotationForm() {
@@ -44,10 +42,14 @@ export default function QuotationForm() {
   const removeSample = (idx) => setSamples(samples.filter((_, i) => i !== idx));
 
   // Running totals shown live on the form, before the server's own calc.
+  // Sums each sample's price GROUPS once each — a parameter marked
+  // combineWithPrevious shares its group's price rather than adding a
+  // separate charge.
   const sampleTotal = (s) => {
-    const perUnit = s.combinedPricing
-      ? Number(s.combinedPrice || 0)
-      : s.parameters.reduce((sum, p) => sum + Number(p.charges || 0), 0);
+    let perUnit = 0;
+    s.parameters.forEach((p, i) => {
+      if (i === 0 || !p.combineWithPrevious) perUnit += Number(p.charges || 0);
+    });
     return perUnit * Number(s.sampleQty || 1) * Number(s.sampleCount || 1);
   };
   const subtotal = samples.reduce((sum, s) => sum + sampleTotal(s), 0);

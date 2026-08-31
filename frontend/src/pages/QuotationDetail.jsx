@@ -116,30 +116,47 @@ export default function QuotationDetail() {
 
             let srNo = 0;
             return groups.flatMap((group) => {
-              const rowCount = group.rows.length;
-              const isCombined = group.rows[0]?.isCombinedPricing;
-              const combinedTotalCents = group.rows.reduce((sum, li) => sum + li.lineTotalCents, 0);
+              const sampleRowCount = group.rows.length;
 
-              return group.rows.map((li, i) => {
-                srNo++;
-                const first = i === 0;
-                return (
-                  <tr key={li.id}>
-                    <td>{srNo}</td>
-                    {first && <td rowSpan={rowCount}>{group.sampleName}</td>}
-                    <td>{li.parameterName}</td>
-                    {first && <td rowSpan={rowCount}>{Number(li.sampleQty).toFixed(0)}</td>}
-                    {isCombined
-                      ? (first && <td rowSpan={rowCount}>{fmt(group.rows[0].chargesPerSampleCents)}</td>)
-                      : <td>{fmt(li.chargesPerSampleCents)}</td>}
-                    {first && <td rowSpan={rowCount}>{Number(li.sampleCount).toFixed(0)}</td>}
-                    {isCombined
-                      ? (first && <td rowSpan={rowCount} style={{ fontWeight: 700 }}>{fmt(combinedTotalCents)}</td>)
-                      : <td>{fmt(li.lineTotalCents)}</td>}
+              const pricingGroups = [];
+              for (const li of group.rows) {
+                let pg = pricingGroups.find((g) => g.pricingGroupIndex === li.pricingGroupIndex);
+                if (!pg) {
+                  pg = { pricingGroupIndex: li.pricingGroupIndex, rows: [] };
+                  pricingGroups.push(pg);
+                }
+                pg.rows.push(li);
+              }
+
+              let sampleRowsRendered = 0;
+              return pricingGroups.flatMap((pg) => {
+                const pgRowCount = pg.rows.length;
+                const isCombined = pg.rows[0]?.isCombinedPricing;
+                const pgTotalCents = pg.rows.reduce((sum, li) => sum + li.lineTotalCents, 0);
+
+                return pg.rows.map((li, i) => {
+                  srNo++;
+                  const firstInSample = sampleRowsRendered === 0;
+                  const firstInGroup = i === 0;
+                  sampleRowsRendered++;
+                  return (
+                    <tr key={li.id}>
+                      <td>{srNo}</td>
+                      {firstInSample && <td rowSpan={sampleRowCount}>{group.sampleName}</td>}
+                      <td>{li.parameterName}</td>
+                      {firstInSample && <td rowSpan={sampleRowCount}>{Number(li.sampleQty).toFixed(0)}</td>}
+                      {isCombined
+                        ? (firstInGroup && <td rowSpan={pgRowCount}>{fmt(pg.rows[0].chargesPerSampleCents)}</td>)
+                        : <td>{fmt(li.chargesPerSampleCents)}</td>}
+                      {firstInSample && <td rowSpan={sampleRowCount}>{Number(li.sampleCount).toFixed(0)}</td>}
+                      {isCombined
+                        ? (firstInGroup && <td rowSpan={pgRowCount} style={{ fontWeight: 700 }}>{fmt(pgTotalCents)}</td>)
+                        : <td>{fmt(li.lineTotalCents)}</td>}
                   </tr>
                 );
               });
             });
+          });
           })()}
         </tbody>
       </table>

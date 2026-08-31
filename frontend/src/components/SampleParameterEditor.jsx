@@ -1,12 +1,11 @@
-// One Sample Name, with any number of Parameters tested under it.
-// Each sample chooses individual or combined pricing:
-//  - Individual: every parameter has its own Charges (₹) field.
-//  - Combined: one Charges (₹) field for the whole sample instead —
-//    useful when a lab charges a package rate rather than summing
-//    individual test prices.
-// Sample Qty. and Sample Count always apply to the whole sample either
-// way. "+ Add Parameter" adds another parameter; "+ Add Sample"
-// (rendered by the parent form) starts a new sample block.
+// One Sample Name, with any number of Parameters tested under it. Each
+// parameter has its own Charges field by default — check "Combine price
+// with parameter above" on any parameter (except the first) to fold it
+// into the pricing group of the parameter directly above it instead,
+// sharing one price. Checking it on consecutive parameters chains them
+// into a single growing group, so a sample can freely mix individually
+// -priced parameters with one or more combined-price groups, all at
+// once. Sample Qty. and Sample Count always apply to the whole sample.
 export default function SampleParameterEditor({ sample, sampleIndex, onChange, onRemoveSample, catalogParameters, canRemoveSample }) {
   const updateField = (patch) => onChange({ ...sample, ...patch });
 
@@ -17,11 +16,20 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
   };
 
   const addParameter = () => {
-    onChange({ ...sample, parameters: [...sample.parameters, { parameterId: null, description: '', charges: '' }] });
+    onChange({
+      ...sample,
+      parameters: [...sample.parameters, { parameterId: null, description: '', charges: '', combineWithPrevious: false }],
+    });
   };
 
   const removeParameter = (paramIndex) => {
-    onChange({ ...sample, parameters: sample.parameters.filter((_, i) => i !== paramIndex) });
+    const nextParameters = sample.parameters.filter((_, i) => i !== paramIndex);
+    // If we removed the first parameter, the new first one can't stay
+    // marked as "combine with previous" — there's nothing above it now.
+    if (paramIndex === 0 && nextParameters.length > 0) {
+      nextParameters[0] = { ...nextParameters[0], combineWithPrevious: false };
+    }
+    onChange({ ...sample, parameters: nextParameters });
   };
 
   const pickCatalogParameter = (paramIndex, parameterId) => {
@@ -33,13 +41,13 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
     updateParameter(paramIndex, { parameterId: entry.id, description: entry.name });
   };
 
-  const toggleCombinedPricing = (combinedPricing) => {
-    onChange({ ...sample, combinedPricing, combinedPrice: sample.combinedPrice || '' });
-  };
-
-  const lineTotal = sample.combinedPricing
-    ? Number(sample.combinedPrice || 0) * Number(sample.sampleQty || 1) * Number(sample.sampleCount || 1)
-    : sample.parameters.reduce((sum, p) => sum + Number(p.charges || 0), 0) * Number(sample.sampleQty || 1) * Number(sample.sampleCount || 1);
+  // Live total: walk the parameters, starting a new price group whenever
+  // combineWithPrevious is false, summing each group's own price once.
+  let lineTotal = 0;
+  sample.parameters.forEach((p, i) => {
+    if (i === 0 || !p.combineWithPrevious) lineTotal += Number(p.charges || 0);
+  });
+  lineTotal *= Number(sample.sampleQty || 1) * Number(sample.sampleCount || 1);
 
   return (
     <div className="card" style={{ marginBottom: 16, background: '#FAFBF8' }}>
@@ -58,74 +66,72 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
         )}
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10 }}>
-        <input
-          type="checkbox"
-          style={{ width: 'auto' }}
-          checked={Boolean(sample.combinedPricing)}
-          onChange={(e) => toggleCombinedPricing(e.target.checked)}
-        />
-        Combined price for this sample (one price for all parameters below, instead of pricing each one)
-      </label>
-
       <table className="line-items-table" style={{ marginBottom: 10 }}>
         <thead>
           <tr>
-            <th style={{ width: '28%' }}>From catalog (optional)</th>
+            <th style={{ width: '25%' }}>From catalog (optional)</th>
             <th>Parameter Name</th>
-            {!sample.combinedPricing && <th style={{ width: 110 }}>Charges (₹)</th>}
+            <th style={{ width: 100 }}>Charges (₹)</th>
+            <th style={{ width: 150 }}>Combine with above</th>
             <th style={{ width: 40 }}></th>
           </tr>
         </thead>
         <tbody>
-          {sample.parameters.map((param, paramIndex) => (
-            <tr key={paramIndex}>
-              <td>
-                <select value={param.parameterId || ''} onChange={(e) => pickCatalogParameter(paramIndex, e.target.value)}>
-                  <option value="">— custom —</option>
-                  {catalogParameters.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <input
-                  required
-                  value={param.description}
-                  onChange={(e) => updateParameter(paramIndex, { description: e.target.value })}
-                  placeholder="e.g. pH, Total Coliform Count"
-                />
-              </td>
-              {!sample.combinedPricing && (
+          {sample.parameters.map((param, paramIndex) => {
+            const combined = paramIndex > 0 && Boolean(param.combineWithPrevious);
+            return (
+              <tr key={paramIndex}>
+                <td>
+                  <select value={param.parameterId || ''} onChange={(e) => pickCatalogParameter(paramIndex, e.target.value)}>
+                    <option value="">— custom —</option>
+                    {catalogParameters.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </td>
                 <td>
                   <input
-                    type="number" min="0" step="0.01" required
-                    value={param.charges}
-                    onChange={(e) => updateParameter(paramIndex, { charges: e.target.value })}
+                    required
+                    value={param.description}
+                    onChange={(e) => updateParameter(paramIndex, { description: e.target.value })}
+                    placeholder="e.g. pH, Total Coliform Count"
                   />
                 </td>
-              )}
-              <td>
-                {sample.parameters.length > 1 && (
-                  <button type="button" className="btn danger" style={{ padding: '4px 8px' }} onClick={() => removeParameter(paramIndex)}>×</button>
-                )}
-              </td>
-            </tr>
-          ))}
+                <td>
+                  {combined ? (
+                    <span style={{ fontSize: 11, color: '#888' }}>shares price above</span>
+                  ) : (
+                    <input
+                      type="number" min="0" step="0.01" required
+                      value={param.charges}
+                      onChange={(e) => updateParameter(paramIndex, { charges: e.target.value })}
+                    />
+                  )}
+                </td>
+                <td>
+                  {paramIndex > 0 && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <input
+                        type="checkbox"
+                        style={{ width: 'auto' }}
+                        checked={combined}
+                        onChange={(e) => updateParameter(paramIndex, { combineWithPrevious: e.target.checked, charges: e.target.checked ? '' : param.charges })}
+                      />
+                      Combine
+                    </label>
+                  )}
+                </td>
+                <td>
+                  {sample.parameters.length > 1 && (
+                    <button type="button" className="btn danger" style={{ padding: '4px 8px' }} onClick={() => removeParameter(paramIndex)}>×</button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <button type="button" className="btn secondary" onClick={addParameter} style={{ marginBottom: 14 }}>+ Add Parameter</button>
-
-      {sample.combinedPricing && (
-        <div className="field" style={{ maxWidth: 220, marginBottom: 14 }}>
-          <label>Combined Charges for this Sample (₹) *</label>
-          <input
-            type="number" min="0" step="0.01" required
-            value={sample.combinedPrice || ''}
-            onChange={(e) => updateField({ combinedPrice: e.target.value })}
-          />
-        </div>
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         <div className="field" style={{ marginBottom: 0 }}>

@@ -27,7 +27,11 @@ function getOrgFromEnv() {
 // different addresses for this business (a receiving/shipping address
 // for vendor deliveries vs. the lab's own letterhead address for
 // quotations). Each QUOTE_ORG_* falls back to the shared ORG_* value if
-// not set, so setting only the shared ones still mostly works.
+// not set. PAN, accreditation, and bank details fall back to this
+// business's actual real values (confirmed from the reference documents
+// provided) rather than blank, so the PDF is correct even without every
+// QUOTE_ORG_* env var set on the host — still overridable via env var
+// if any of these details ever change.
 function getQuotationOrgFromEnv() {
   return {
     name: process.env.QUOTE_ORG_NAME || process.env.ORG_NAME || 'Your Company Pvt. Ltd.',
@@ -35,15 +39,15 @@ function getQuotationOrgFromEnv() {
     email: process.env.QUOTE_ORG_EMAIL || process.env.ORG_EMAIL || '',
     phone: process.env.QUOTE_ORG_PHONE || process.env.ORG_PHONE || '',
     gst: process.env.QUOTE_ORG_GST || process.env.ORG_GST || '',
-    pan: process.env.QUOTE_ORG_PAN || '',
-    accreditation: process.env.QUOTE_ORG_ACCREDITATION || '', // e.g. "(NABL Accredited Laboratory), TC-11169"
+    pan: process.env.QUOTE_ORG_PAN || 'AAWCS9548J',
+    accreditation: process.env.QUOTE_ORG_ACCREDITATION || '(NABL Accredited Laboratory), TC-11169',
     footerAddress: process.env.QUOTE_ORG_FOOTER_ADDRESS || '', // corporate/registered address line for the PDF footer
     quoteValidityDays: process.env.QUOTE_ORG_VALIDITY_DAYS || '30',
-    bankAccountName: process.env.QUOTE_ORG_BANK_ACCOUNT_NAME || '',
-    bankName: process.env.QUOTE_ORG_BANK_NAME || '',
-    bankAccountNo: process.env.QUOTE_ORG_BANK_ACCOUNT_NO || '',
-    bankBranch: process.env.QUOTE_ORG_BANK_BRANCH || '',
-    bankIfsc: process.env.QUOTE_ORG_BANK_IFSC || '',
+    bankAccountName: process.env.QUOTE_ORG_BANK_ACCOUNT_NAME || 'Shoolini Lifesciences Pvt. Ltd.',
+    bankName: process.env.QUOTE_ORG_BANK_NAME || 'Punjab National Bank',
+    bankAccountNo: process.env.QUOTE_ORG_BANK_ACCOUNT_NO || '0433002100075898',
+    bankBranch: process.env.QUOTE_ORG_BANK_BRANCH || 'The mall Road, Solan',
+    bankIfsc: process.env.QUOTE_ORG_BANK_IFSC || 'PUNB0043300',
   };
 }
 
