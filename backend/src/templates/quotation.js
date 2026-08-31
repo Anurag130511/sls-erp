@@ -20,8 +20,12 @@ const styles = `
     font-size: 12px;
     line-height: 1.55;
   }
+  .top-bar {
+    height: 7px;
+    background: linear-gradient(90deg, ${GREEN} 0%, ${GREEN_DARK} 100%);
+  }
   .page {
-    padding: 28px 42px 20px 42px;
+    padding: 24px 42px 20px 42px;
   }
 
   .letterhead {
@@ -37,12 +41,16 @@ const styles = `
   .letterhead-details { font-size: 10.5px; color: #444; line-height: 1.6; }
   .letterhead-details strong { color: #222; }
   .accreditation {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
-    color: ${GREEN_DARK};
-    text-align: right;
-    max-width: 220px;
-    line-height: 1.5;
+    color: #fff;
+    background: ${GREEN_DARK};
+    text-align: center;
+    white-space: nowrap;
+    border-radius: 12px;
+    padding: 5px 14px;
+    align-self: flex-start;
+    margin-top: 2px;
   }
 
   .meta-row {
@@ -51,19 +59,16 @@ const styles = `
     align-items: center;
     margin-bottom: 14px;
   }
-  .meta-row .quote-no {
-    font-size: 13px;
-    font-weight: 700;
-    color: ${GREEN_DARK};
-  }
+  .meta-row .quote-no,
   .meta-row .quote-date {
     font-size: 12px;
     font-weight: 700;
     background: ${GRAY_LIGHT};
     border: 1px solid ${GRAY};
     border-radius: 4px;
-    padding: 4px 12px;
+    padding: 5px 14px;
   }
+  .meta-row .quote-no { color: ${GREEN_DARK}; }
 
   .letter-box {
     border: 1px solid ${GRAY};
@@ -72,9 +77,12 @@ const styles = `
     padding: 14px 18px;
     margin-bottom: 16px;
     background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   .letter-fields div { margin-bottom: 3px; }
   .letter-fields .label { font-weight: 700; color: ${GREEN_DARK}; display: inline-block; min-width: 100px; }
+  .letter-fields .subject-line { font-size: 12.5px; }
+  .letter-fields .subject-value { font-weight: 700; color: #1a1a1a; }
 
   .greeting { margin: 14px 0; }
   .greeting p { margin: 4px 0; }
@@ -90,6 +98,7 @@ const styles = `
     margin: 16px 0 4px 0;
     border-radius: 4px;
     overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   table.items th, table.items td {
     border: 1px solid ${GRAY};
@@ -113,6 +122,7 @@ const styles = `
     margin-left: auto;
     border-collapse: collapse;
     margin-top: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   table.totals td {
     border: 1px solid ${GRAY};
@@ -131,11 +141,17 @@ const styles = `
 
   .signature-block {
     text-align: right;
-    margin-top: 26px;
+    margin-top: 22px;
     font-size: 11px;
     color: #444;
   }
-  .signature-block .title { font-weight: 700; color: ${GREEN_DARK}; margin-bottom: 3px; }
+  .signature-block .title {
+    font-weight: 700;
+    color: ${GREEN_DARK};
+    margin-bottom: 4px;
+    font-size: 11.5px;
+  }
+  .signature-block img { height: 68px; display: inline-block; }
 
   .terms {
     margin-top: 24px;
@@ -146,13 +162,27 @@ const styles = `
   }
   .terms .heading {
     font-weight: 700;
-    color: ${GREEN_DARK};
-    margin-bottom: 5px;
-    font-size: 11px;
+    color: #fff;
+    background: ${GREEN_DARK};
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
   }
-  .terms div { margin-bottom: 2.5px; }
+  .terms div.term-item { margin-bottom: 3px; padding-left: 14px; position: relative; }
+  .terms div.term-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 5px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: ${GREEN};
+  }
 
   .page-footer {
     margin-top: 26px;
@@ -175,7 +205,7 @@ const styles = `
   }
 `;
 
-function quotationHtml(quotation, org, logoDataUri) {
+function quotationHtml(quotation, org, logoDataUri, signatureDataUri) {
   const salesPersonName = quotation.salesPersonName || '';
   const salesPersonContactNo = quotation.salesPersonContactNo || '';
 
@@ -272,6 +302,7 @@ function quotationHtml(quotation, org, logoDataUri) {
     <style>${styles}</style>
   </head>
   <body>
+  <div class="top-bar"></div>
   <div class="page">
     <div class="letterhead">
       <div class="letterhead-logo">
@@ -282,7 +313,7 @@ function quotationHtml(quotation, org, logoDataUri) {
           ${org.email ? `<strong>Email:</strong> ${escapeHtml(org.email)}` : ''}${org.phone ? ` &nbsp; <strong>Phone:</strong> ${escapeHtml(org.phone)}` : ''}
         </div>
       </div>
-      <div class="accreditation">${escapeHtml(org.accreditation)}</div>
+      ${org.accreditation ? `<div class="accreditation">${escapeHtml(org.accreditation)}</div>` : ''}
     </div>
 
     <div class="meta-row">
@@ -296,7 +327,7 @@ function quotationHtml(quotation, org, logoDataUri) {
         <div><span class="label">Contact Person:</span> ${escapeHtml(quotation.customer?.contactPerson || '')}</div>
         <div><span class="label">Email:</span> ${escapeHtml(quotation.customer?.email || '')}</div>
         <div><span class="label">Mobile No.:</span> ${escapeHtml(quotation.customer?.phone || '')}</div>
-        <div><span class="label">Sub. :-</span> ${escapeHtml(quotation.subject || '')}</div>
+        <div class="subject-line"><span class="label">Sub. :-</span> <span class="subject-value">${escapeHtml(quotation.subject || '')}</span></div>
       </div>
 
       <div class="greeting">
@@ -354,19 +385,20 @@ function quotationHtml(quotation, org, logoDataUri) {
 
     <div class="signature-block">
       <div class="title">Authorized Signatory</div>
-      <div>${escapeHtml(org.name)}</div>
-      ${org.address ? `<div>${escapeHtml(org.address)}</div>` : ''}
+      ${signatureDataUri
+        ? `<img src="${signatureDataUri}" />`
+        : `<div>${escapeHtml(org.name)}</div>${org.address ? `<div>${escapeHtml(org.address)}</div>` : ''}`}
     </div>
 
     <div class="terms">
       <div class="heading">Terms &amp; Conditions</div>
-      <div>*Validity of Quote ${escapeHtml(org.quoteValidityDays)} days.</div>
-      <div>*GST shall be charged as per applicable rate, currently ${Number(quotation.gstPercent).toFixed(0)}%.</div>
-      ${bankDetailsLine ? `<div>*Bank Details: Account holder name: ${escapeHtml(bankDetailsLine)}.</div>` : ''}
-      ${bankAccountLine ? `<div>*${escapeHtml(bankAccountLine)}.</div>` : ''}
-      <div>*Sample Should be received with written work order.</div>
-      <div>*Payment Should be advanced through RTGS/NEFT.</div>
-      ${quotation.terms ? quotation.terms.split('\n').filter(Boolean).map((t) => `<div>*${escapeHtml(t)}</div>`).join('') : ''}
+      <div class="term-item">Validity of Quote ${escapeHtml(org.quoteValidityDays)} days.</div>
+      <div class="term-item">GST shall be charged as per applicable rate, currently ${Number(quotation.gstPercent).toFixed(0)}%.</div>
+      ${bankDetailsLine ? `<div class="term-item">Bank Details: Account holder name: ${escapeHtml(bankDetailsLine)}.</div>` : ''}
+      ${bankAccountLine ? `<div class="term-item">${escapeHtml(bankAccountLine)}.</div>` : ''}
+      <div class="term-item">Sample Should be received with written work order.</div>
+      <div class="term-item">Payment Should be advanced through RTGS/NEFT.</div>
+      ${quotation.terms ? quotation.terms.split('\n').filter(Boolean).map((t) => `<div class="term-item">${escapeHtml(t)}</div>`).join('') : ''}
     </div>
 
     ${org.footerAddress ? `<div class="page-footer">${escapeHtml(org.footerAddress)}</div>` : ''}

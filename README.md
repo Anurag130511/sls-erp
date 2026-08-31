@@ -374,6 +374,15 @@ The quotation PDF and detail page are built to match this business's
 actual quotation format exactly — letterhead, customer letter block,
 sample/parameter table, totals, terms, and footer.
 
+**Signature**: every quotation PDF automatically shows the real
+signature/stamp image (`backend/assets/signature.png`) in the
+Authorized Signatory block — no manual signing needed. To replace it
+(e.g. a different signatory later), just swap that file for a new
+image of the same rough shape (wide, transparent or white background)
+and redeploy; no code change needed. If that file is ever missing, the
+PDF falls back to a plain text "Authorized Signatory" block instead of
+failing.
+
 **Samples & Parameters** (matches the "Sample Name / Parameters / Sample
 Qty. / Charges per Sample / Sample count / Total" columns of the real
 format — pricing is always per-sample here, never per-parameter):

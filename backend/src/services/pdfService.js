@@ -5,9 +5,19 @@ const purchaseOrderHtml = require('../templates/purchaseOrder');
 const quotationHtml = require('../templates/quotation');
 
 const LOGO_PATH = path.join(__dirname, '../../assets/logo.png');
+const SIGNATURE_PATH = path.join(__dirname, '../../assets/signature.png');
 
 function getLogoDataUri() {
   const buffer = fs.readFileSync(LOGO_PATH);
+  return `data:image/png;base64,${buffer.toString('base64')}`;
+}
+
+// Returns null if no signature image has been provided — the quotation
+// template falls back to a plain text "Authorized Signatory" block in
+// that case, so this is safe to call even before one is set up.
+function getSignatureDataUri() {
+  if (!fs.existsSync(SIGNATURE_PATH)) return null;
+  const buffer = fs.readFileSync(SIGNATURE_PATH);
   return `data:image/png;base64,${buffer.toString('base64')}`;
 }
 
@@ -86,7 +96,7 @@ async function generatePurchaseOrderPdf(po) {
 }
 
 async function generateQuotationPdf(quotation) {
-  const html = quotationHtml(quotation, getQuotationOrgFromEnv(), getLogoDataUri());
+  const html = quotationHtml(quotation, getQuotationOrgFromEnv(), getLogoDataUri(), getSignatureDataUri());
   return renderPdf(html);
 }
 
