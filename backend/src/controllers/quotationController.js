@@ -274,11 +274,14 @@ const revise = async (req, res) => {
 
   const result = await sequelize.transaction(async (t) => {
     const nextRevisionNumber = source.revisionNumber + 1;
-    // Strip any existing "-R<n>" suffix from the root number before
+    // Strip any existing "(R)"/"(R2)" suffix from the root number before
     // appending the new one, so revising a revision stays clean
-    // (QT-006-R1 revised again becomes QT-006-R2, not QT-006-R1-R2).
-    const rootNumber = source.quotationNumber.replace(/-R\d+$/, '');
-    const quotationNumber = `${rootNumber}-R${nextRevisionNumber}`;
+    // (QT-006(R) revised again becomes QT-006(R2), not QT-006(R)(R2)).
+    // The first revision is just "(R)"; later ones are numbered so each
+    // revision still gets a unique, distinguishable quotation number.
+    const rootNumber = source.quotationNumber.replace(/\(R\d*\)$/, '');
+    const revisionSuffix = nextRevisionNumber === 1 ? '(R)' : `(R${nextRevisionNumber})`;
+    const quotationNumber = `${rootNumber}${revisionSuffix}`;
 
     const revised = await Quotation.create(
       {
