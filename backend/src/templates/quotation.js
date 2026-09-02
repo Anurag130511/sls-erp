@@ -13,19 +13,24 @@ const GRAY_LIGHT = '#F6FAF3';
 const styles = `
   * { box-sizing: border-box; }
   body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: Arial, 'Liberation Sans', 'DejaVu Sans', sans-serif;
     color: #222;
     margin: 0;
     padding: 0;
     font-size: 12px;
-    line-height: 1.55;
+    line-height: 1.45;
   }
+  /* -webkit-text-stroke guarantees a visibly bold look even on hosts
+     where the font-weight:700 face isn't actually installed (a common
+     issue for headless Chromium on minimal Linux servers) — it draws a
+     thin outline in the same color, thickening the letterforms
+     regardless of which font actually ends up rendering. */
   .top-bar {
-    height: 7px;
+    height: 5px;
     background: linear-gradient(90deg, ${GREEN} 0%, ${GREEN_DARK} 100%);
   }
   .page {
-    padding: 24px 42px 20px 42px;
+    padding: 16px 42px 12px 42px;
   }
 
   .letterhead {
@@ -33,16 +38,17 @@ const styles = `
     justify-content: space-between;
     align-items: flex-start;
     border-bottom: 3px solid ${GREEN};
-    padding-bottom: 14px;
-    margin-bottom: 16px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
   }
   .letterhead-logo { display: flex; align-items: center; gap: 12px; }
-  .letterhead-logo img { height: 50px; }
-  .letterhead-details { font-size: 10.5px; color: #444; line-height: 1.6; }
-  .letterhead-details strong { color: #222; }
+  .letterhead-logo img { height: 46px; }
+  .letterhead-details { font-size: 10.5px; color: #444; line-height: 1.55; }
+  .letterhead-details strong { color: #222; font-weight: 700; -webkit-text-stroke: 0.3px currentColor; }
   .accreditation {
     font-size: 10px;
     font-weight: 700;
+    -webkit-text-stroke: 0.3px #fff;
     color: #fff;
     background: ${GREEN_DARK};
     text-align: center;
@@ -57,12 +63,13 @@ const styles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
   }
   .meta-row .quote-no,
   .meta-row .quote-date {
     font-size: 12px;
     font-weight: 700;
+    -webkit-text-stroke: 0.35px currentColor;
     background: ${GRAY_LIGHT};
     border: 1px solid ${GRAY};
     border-radius: 4px;
@@ -74,35 +81,41 @@ const styles = `
     border: 1px solid ${GRAY};
     border-left: 4px solid ${GREEN};
     border-radius: 4px;
-    padding: 14px 18px;
-    margin-bottom: 16px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
     background: #fff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-  .letter-fields div { margin-bottom: 3px; }
-  .letter-fields .label { font-weight: 700; color: ${GREEN_DARK}; display: inline-block; min-width: 100px; }
+  .letter-fields div { margin-bottom: 2px; }
+  .letter-fields .label {
+    font-weight: 700;
+    -webkit-text-stroke: 0.35px currentColor;
+    color: ${GREEN_DARK};
+    display: inline-block;
+    min-width: 100px;
+  }
   .letter-fields .subject-line { font-size: 12.5px; }
-  .letter-fields .subject-value { font-weight: 700; color: #1a1a1a; }
+  .letter-fields .subject-value { font-weight: 700; -webkit-text-stroke: 0.35px currentColor; color: #1a1a1a; }
 
-  .greeting { margin: 14px 0; }
-  .greeting p { margin: 4px 0; }
-  .greeting .greet-line { font-weight: 700; color: #222; }
+  .greeting { margin: 10px 0; }
+  .greeting p { margin: 3px 0; }
+  .greeting .greet-line { font-weight: 700; -webkit-text-stroke: 0.3px currentColor; color: #222; }
 
-  .signoff { margin: 14px 0 0 0; }
-  .signoff .label { font-weight: 700; text-decoration: underline; color: ${GREEN_DARK}; }
+  .signoff { margin: 10px 0 0 0; }
+  .signoff .label { font-weight: 700; -webkit-text-stroke: 0.3px currentColor; text-decoration: underline; color: ${GREEN_DARK}; }
   .signoff div { margin-top: 1px; }
 
   table.items {
     width: 100%;
     border-collapse: collapse;
-    margin: 16px 0 4px 0;
+    margin: 12px 0 4px 0;
     border-radius: 4px;
     overflow: hidden;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   table.items th, table.items td {
     border: 1px solid ${GRAY};
-    padding: 7px 8px;
+    padding: 6px 8px;
     font-size: 11px;
     text-align: center;
     vertical-align: middle;
@@ -111,22 +124,24 @@ const styles = `
     background: ${GREEN};
     color: #fff;
     font-weight: 700;
+    -webkit-text-stroke: 0.4px #fff;
     text-transform: uppercase;
     letter-spacing: 0.2px;
     font-size: 10.2px;
   }
   table.items tbody tr:nth-child(even) { background: ${GRAY_LIGHT}; }
+  table.items td strong { -webkit-text-stroke: 0.3px currentColor; }
 
   table.totals {
     width: 320px;
     margin-left: auto;
     border-collapse: collapse;
-    margin-top: 6px;
+    margin-top: 4px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   table.totals td {
     border: 1px solid ${GRAY};
-    padding: 7px 10px;
+    padding: 6px 10px;
     font-size: 11.5px;
     font-weight: 600;
   }
@@ -136,43 +151,46 @@ const styles = `
     background: ${GREEN};
     color: #fff;
     font-weight: 700;
+    -webkit-text-stroke: 0.35px #fff;
     font-size: 13px;
   }
 
   .signature-block {
     text-align: right;
-    margin-top: 22px;
+    margin-top: 14px;
     font-size: 11px;
     color: #444;
   }
   .signature-block .title {
     font-weight: 700;
+    -webkit-text-stroke: 0.3px currentColor;
     color: ${GREEN_DARK};
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     font-size: 11.5px;
   }
-  .signature-block img { height: 68px; display: inline-block; }
+  .signature-block img { height: 58px; display: inline-block; }
 
   .terms {
-    margin-top: 24px;
+    margin-top: 16px;
     font-size: 10.3px;
     color: #444;
     border-top: 1px solid ${GRAY};
-    padding-top: 12px;
+    padding-top: 8px;
   }
   .terms .heading {
     font-weight: 700;
+    -webkit-text-stroke: 0.3px #fff;
     color: #fff;
     background: ${GREEN_DARK};
     display: inline-block;
     padding: 3px 12px;
     border-radius: 10px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
   }
-  .terms div.term-item { margin-bottom: 3px; padding-left: 14px; position: relative; }
+  .terms div.term-item { margin-bottom: 2px; padding-left: 14px; position: relative; }
   .terms div.term-item::before {
     content: '';
     position: absolute;
@@ -185,8 +203,8 @@ const styles = `
   }
 
   .page-footer {
-    margin-top: 26px;
-    padding-top: 10px;
+    margin-top: 16px;
+    padding-top: 8px;
     border-top: 2px solid ${GREEN};
     font-size: 9.5px;
     color: #777;
@@ -364,17 +382,21 @@ function quotationHtml(quotation, org, logoDataUri, signatureDataUri) {
 
     <table class="totals">
       <tr>
-        <td class="label" colspan="6">Total</td>
-        <td class="value">${formatINR(quotation.subtotalCents - quotation.discountCents)}</td>
+        <td class="label" colspan="6">Subtotal</td>
+        <td class="value">${formatINR(quotation.subtotalCents)}</td>
       </tr>
-      ${quotation.discountCents > 0 ? `
+      ${Number(quotation.discountPercent) > 0 ? `
       <tr>
-        <td class="label" colspan="6">Discount</td>
+        <td class="label" colspan="6">Discount (${Number(quotation.discountPercent).toFixed(quotation.discountPercent % 1 === 0 ? 0 : 2)}%)</td>
         <td class="value">-${formatINR(quotation.discountCents)}</td>
+      </tr>
+      <tr>
+        <td class="label" colspan="6">Total after Discount</td>
+        <td class="value">${formatINR(quotation.subtotalCents - quotation.discountCents)}</td>
       </tr>` : ''}
       ${quotation.gstApplicable ? `
       <tr>
-        <td class="label" colspan="6">GST ${Number(quotation.gstPercent).toFixed(0)}%</td>
+        <td class="label" colspan="6">GST (${Number(quotation.gstPercent).toFixed(0)}%)</td>
         <td class="value">${formatINR(quotation.gstCents)}</td>
       </tr>` : ''}
       <tr class="grand">

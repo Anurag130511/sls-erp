@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../api/AuthContext';
 import SampleParameterEditor from '../components/SampleParameterEditor';
@@ -11,8 +11,47 @@ const emptySample = () => ({
   sampleCount: 1,
 });
 
+// Rebuilds the samples/parameters UI shape from a saved quotation's flat
+// (one-row-per-parameter) lineItems — grouping first by sampleIndex,
+// then by pricingGroupIndex within each sample. The first parameter in
+// a pricing group carries that group's price; any others are marked
+// combineWithPrevious so the editor shows them sharing it, matching
+// exactly how the data was entered originally.
+function samplesFromLineItems(lineItems) {
+  const bySample = [];
+  for (const li of [...lineItems].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    let sample = bySample.find((s) => s.sampleIndex === li.sampleIndex);
+    if (!sample) {
+      sample = {
+        sampleIndex: li.sampleIndex,
+        sampleName: li.sampleName,
+        sampleQty: Number(li.sampleQty),
+        sampleCount: Number(li.sampleCount),
+        parameters: [],
+        _groups: [],
+      };
+      bySample.push(sample);
+    }
+    let group = sample._groups.find((g) => g.pricingGroupIndex === li.pricingGroupIndex);
+    const isFirstInGroup = !group;
+    if (!group) {
+      group = { pricingGroupIndex: li.pricingGroupIndex };
+      sample._groups.push(group);
+    }
+    sample.parameters.push({
+      parameterId: null,
+      description: li.parameterName,
+      charges: isFirstInGroup ? (li.chargesPerSampleCents / 100).toString() : '',
+      combineWithPrevious: !isFirstInGroup,
+    });
+  }
+  return bySample.map(({ _groups, sampleIndex, ...rest }) => rest);
+}
+
 export default function QuotationForm() {
   const navigate = useNavigate();
+  const { id } = useParams(); // present only when editing an existing draft
+  const isEditMode = Boolean(id);
   const { user } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [parameters, setParameters] = useState([]);
@@ -22,15 +61,32 @@ export default function QuotationForm() {
   const [subject, setSubject] = useState('');
   const [terms, setTerms] = useState('');
   const [samples, setSamples] = useState([emptySample()]);
-  const [discount, setDiscount] = useState('0');
+  const [discountPercent, setDiscountPercent] = useState('0');
   const [gstApplicable, setGstApplicable] = useState(true);
+  const [quotationNumber, setQuotationNumber] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
 
   useEffect(() => {
     api.get('/customers').then(setCustomers);
     api.get('/parameters').then(setParameters);
   }, []);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+    api.get(`/quotations/${id}`).then((q) => {
+      setQuotationNumber(q.quotationNumber);
+      setCustomerId(String(q.customerId));
+      setIssueDate(q.issueDate);
+      setExpiryDate(q.expiryDate || '');
+      setSubject(q.subject || '');
+      setTerms(q.terms || '');
+      setDiscountPercent(String(q.discountPercent || 0));
+      setGstApplicable(Boolean(q.gstApplicable));
+      setSamples(samplesFromLineItems(q.lineItems));
+    }).catch((err) => setError(err.message)).finally(() => setLoading(false));
+  }, [id, isEditMode]);
 
   const updateSample = (idx, nextSample) => {
     const next = [...samples];
@@ -42,9 +98,6 @@ export default function QuotationForm() {
   const removeSample = (idx) => setSamples(samples.filter((_, i) => i !== idx));
 
   // Running totals shown live on the form, before the server's own calc.
-  // Sums each sample's price GROUPS once each — a parameter marked
-  // combineWithPrevious shares its group's price rather than adding a
-  // separate charge.
   const sampleTotal = (s) => {
     let perUnit = 0;
     s.parameters.forEach((p, i) => {
@@ -53,7 +106,8 @@ export default function QuotationForm() {
     return perUnit * Number(s.sampleQty || 1) * Number(s.sampleCount || 1);
   };
   const subtotal = samples.reduce((sum, s) => sum + sampleTotal(s), 0);
-  const afterDiscount = subtotal - Number(discount || 0);
+  const discountAmount = subtotal * (Number(discountPercent || 0) / 100);
+  const afterDiscount = subtotal - discountAmount;
   const gstAmount = gstApplicable ? afterDiscount * 0.18 : 0;
   const grandTotal = afterDiscount + gstAmount;
 
@@ -69,17 +123,18 @@ export default function QuotationForm() {
     }
     setSaving(true);
     try {
-      const q = await api.post('/quotations', {
+      const payload = {
         customerId: Number(customerId),
         issueDate,
         expiryDate: expiryDate || null,
         subject,
         terms,
         samples,
-        discount: Number(discount || 0),
+        discountPercent: Number(discountPercent || 0),
         gstApplicable,
         gstPercent: 18,
-      });
+      };
+      const q = isEditMode ? await api.put(`/quotations/${id}`, payload) : await api.post('/quotations', payload);
       navigate(`/quotations/${q.id}`);
     } catch (err) {
       setError(err.message);
@@ -92,9 +147,11 @@ export default function QuotationForm() {
     ? user.designation ? `${user.name} — ${user.designation}` : user.name
     : '';
 
+  if (loading) return <p>Loading…</p>;
+
   return (
     <div>
-      <div className="page-header"><h1>New Quotation</h1></div>
+      <div className="page-header"><h1>{isEditMode ? `Edit ${quotationNumber}` : 'New Quotation'}</h1></div>
 
       <form onSubmit={submit}>
         <div className="card" style={{ marginBottom: 16 }}>
@@ -144,8 +201,8 @@ export default function QuotationForm() {
         <div className="card">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 8 }}>
             <div className="field">
-              <label>Overall Discount (₹)</label>
-              <input type="number" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              <label>Overall Discount (%)</label>
+              <input type="number" min="0" max="100" step="0.01" value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} />
             </div>
             <div className="field">
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, marginTop: 22 }}>
@@ -162,12 +219,17 @@ export default function QuotationForm() {
 
           <div style={{ width: 300, marginLeft: 'auto', fontSize: 13, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span>Total</span><span>₹{subtotal.toFixed(2)}</span>
+              <span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span>
             </div>
-            {Number(discount || 0) > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span>Discount</span><span>-₹{Number(discount || 0).toFixed(2)}</span>
-              </div>
+            {Number(discountPercent || 0) > 0 && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Discount ({Number(discountPercent).toFixed(2).replace(/\.?0+$/, '')}%)</span><span>-₹{discountAmount.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Total after Discount</span><span>₹{afterDiscount.toFixed(2)}</span>
+                </div>
+              </>
             )}
             {gstApplicable && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -186,7 +248,7 @@ export default function QuotationForm() {
 
           {error && <p style={{ color: '#C0392B' }}>{error}</p>}
           <button className="btn" type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save Quotation'}
+            {saving ? 'Saving…' : isEditMode ? 'Save Changes' : 'Save Quotation'}
           </button>
         </div>
       </form>

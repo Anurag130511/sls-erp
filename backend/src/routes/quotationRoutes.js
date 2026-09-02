@@ -10,6 +10,7 @@ router.get('/:id', ctrl.get);
 router.post('/', ctrl.create);
 router.put('/:id', ctrl.update);
 router.patch('/:id/status', ctrl.setStatus);
+router.post('/:id/revise', ctrl.revise);
 router.delete('/:id', ctrl.remove);
 
 router.get('/:id/pdf', async (req, res) => {

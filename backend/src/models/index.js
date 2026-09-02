@@ -44,6 +44,10 @@ User.hasMany(Quotation, { foreignKey: 'createdById' });
 PurchaseOrder.belongsTo(User, { foreignKey: 'createdById', as: 'createdBy', onDelete: 'SET NULL' });
 User.hasMany(PurchaseOrder, { foreignKey: 'createdById' });
 
+// Quotation <-> the quotation it was revised from (self-referencing).
+Quotation.belongsTo(Quotation, { foreignKey: 'revisionOfId', as: 'revisionOf' });
+Quotation.hasMany(Quotation, { foreignKey: 'revisionOfId', as: 'revisions' });
+
 module.exports = {
   sequelize,
   User,

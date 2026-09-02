@@ -24,6 +24,11 @@ const Quotation = sequelize.define('Quotation', {
   salesPersonDesignation: { type: DataTypes.STRING, allowNull: true },
   salesPersonContactNo: { type: DataTypes.STRING, allowNull: true },
   subtotalCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  // Discount is entered as a percentage; discountCents is always derived
+  // (subtotal x discountPercent / 100) and stored alongside it purely so
+  // the PDF/detail page/reports can keep showing a rupee figure without
+  // recomputing it from scratch every time.
+  discountPercent: { type: DataTypes.DECIMAL(5, 2), allowNull: false, defaultValue: 0 },
   discountCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   // GST is optional per quotation — gstApplicable toggles whether it's
   // charged at all; gstPercent defaults to 18% (the standard rate this
@@ -34,6 +39,14 @@ const Quotation = sequelize.define('Quotation', {
   totalCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   notes: { type: DataTypes.TEXT },
   terms: { type: DataTypes.TEXT },
+  // Revisions: revising a quotation creates a new draft Quotation row
+  // (copying customer/samples/discount/GST/etc.) rather than editing the
+  // original in place — so a quotation the customer already has a copy
+  // of never silently changes. revisionOfId points to the immediate
+  // quotation it was revised from (null for an original); revisionNumber
+  // is 0 for an original, 1/2/3... for successive revisions.
+  revisionOfId: { type: DataTypes.INTEGER, allowNull: true },
+  revisionNumber: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 });
 
 module.exports = Quotation;

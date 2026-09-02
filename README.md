@@ -436,6 +436,22 @@ their list, and won't open even by direct link. The admin-only
 **Reports** page still lets an admin pull everyone's data, or filter to
 one person, regardless of this.
 
+## Discounts and revising a quotation
+
+**Discount is entered as a percentage** (not a flat rupee amount) —
+the form shows Subtotal → Discount (%) → Total after Discount → GST →
+Grand Total, and the PDF matches that same sequence.
+
+**Revising a quotation**: once a quotation is no longer a draft (sent,
+accepted, etc.), you can no longer edit it directly — the customer may
+already have a copy. Instead, click **Revise** on its detail page. This
+creates a new, fully editable draft copy (new number like
+`SLS/26-27/QT-006-R1`, samples/discount/GST all copied over) and takes
+you straight into editing it — change rates, add or remove parameters,
+adjust the discount, anything. The original quotation is never touched.
+A draft (including a fresh revision) can also be edited directly via
+the **Edit** button on its detail page, without going through Revise.
+
 ## Mixing pricing within one sample
 
 A sample's parameters don't all have to be priced the same way. By

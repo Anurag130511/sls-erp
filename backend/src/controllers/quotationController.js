@@ -8,6 +8,7 @@ const INCLUDE = [
   { model: Customer, as: 'customer' },
   { model: QuotationLineItem, as: 'lineItems' },
   { model: User, as: 'createdBy', attributes: ['id', 'name', 'email', 'designation', 'contactNo'] },
+  { model: Quotation, as: 'revisionOf', attributes: ['id', 'quotationNumber'] },
 ];
 
 /**
@@ -37,10 +38,6 @@ async function buildLinesAndSaveNewParameters(samples, t) {
     const sampleQty = Number(sample.sampleQty || 1);
     const sampleCount = Number(sample.sampleCount || 1);
 
-    // Split this sample's parameters into pricing groups: a new group
-    // starts at index 0 or whenever a parameter is NOT marked to combine
-    // with the previous one; combineWithPrevious chains it onto the
-    // current group instead.
     const groups = [];
     for (let i = 0; i < sample.parameters.length; i++) {
       const param = sample.parameters[i];
@@ -54,9 +51,6 @@ async function buildLinesAndSaveNewParameters(samples, t) {
     for (let groupIndex = 0; groupIndex < groups.length; groupIndex++) {
       const group = groups[groupIndex];
       const isCombinedPricing = group.length > 1;
-      // The group's price is always entered on its first (root) member —
-      // members added via "combine with previous" don't get their own
-      // price field in the UI, so their own `charges` value is ignored.
       const groupChargeCents = toCents(group[0].charges || 0);
 
       for (let j = 0; j < group.length; j++) {
@@ -95,12 +89,16 @@ async function buildLinesAndSaveNewParameters(samples, t) {
   return lines;
 }
 
-function computeTotalsFromLines(lines, discountCents, gstApplicable, gstPercent) {
+// Discount is a percentage of the subtotal — discountCents is always
+// derived here, never entered directly, so "Total after Discount" and
+// "Grand Total" (after GST) stay consistent no matter which piece changed.
+function computeTotalsFromLines(lines, discountPercent, gstApplicable, gstPercent) {
   const subtotalCents = lines.reduce((sum, li) => sum + li.lineTotalCents, 0);
-  const preTaxTotalCents = subtotalCents - discountCents;
-  const gstCents = gstApplicable ? Math.round((preTaxTotalCents * Number(gstPercent || 18)) / 100) : 0;
-  const totalCents = preTaxTotalCents + gstCents;
-  return { subtotalCents, gstCents, totalCents };
+  const discountCents = Math.round((subtotalCents * Number(discountPercent || 0)) / 100);
+  const afterDiscountCents = subtotalCents - discountCents;
+  const gstCents = gstApplicable ? Math.round((afterDiscountCents * Number(gstPercent || 18)) / 100) : 0;
+  const totalCents = afterDiscountCents + gstCents;
+  return { subtotalCents, discountCents, gstCents, totalCents };
 }
 
 const list = async (req, res) => {
@@ -108,9 +106,6 @@ const list = async (req, res) => {
   const where = {};
   if (status) where.status = status;
   if (customerId) where.customerId = customerId;
-  // Admins can optionally filter to one salesperson (e.g. from Reports);
-  // non-admins are always scoped to their own records regardless of
-  // what's in the query string.
   if (req.user.role === 'admin') {
     if (userId) where.createdById = userId;
   } else {
@@ -129,7 +124,7 @@ const get = async (req, res) => {
 };
 
 const create = async (req, res) => {
-  const { customerId, issueDate, expiryDate, subject, notes, terms, samples, discount, gstApplicable, gstPercent } = req.body;
+  const { customerId, issueDate, expiryDate, subject, notes, terms, samples, discountPercent, gstApplicable, gstPercent } = req.body;
 
   if (!customerId || !issueDate || !Array.isArray(samples) || samples.length === 0) {
     return res.status(400).json({ error: 'customerId, issueDate and at least one sample are required' });
@@ -143,13 +138,12 @@ const create = async (req, res) => {
   const result = await sequelize.transaction(async (t) => {
     const quotationNumber = await nextQuotationNumber();
     const lines = await buildLinesAndSaveNewParameters(samples, t);
-    const discountCents = toCents(discount || 0);
     // GST defaults to on — this lab charges it on essentially every
     // quotation, so the form starts checked rather than requiring an
     // opt-in each time (still toggleable for the rare exempt customer).
     const gstOn = gstApplicable !== undefined ? Boolean(gstApplicable) : true;
-    const { subtotalCents, gstCents, totalCents } = computeTotalsFromLines(
-      lines, discountCents, gstOn, gstPercent || 18
+    const { subtotalCents, discountCents, gstCents, totalCents } = computeTotalsFromLines(
+      lines, discountPercent || 0, gstOn, gstPercent || 18
     );
 
     const quotation = await Quotation.create(
@@ -163,6 +157,7 @@ const create = async (req, res) => {
         terms,
         status: 'draft',
         subtotalCents,
+        discountPercent: discountPercent || 0,
         discountCents,
         gstApplicable: gstOn,
         gstPercent: gstPercent || 18,
@@ -189,33 +184,35 @@ const create = async (req, res) => {
 };
 
 // Editing is only allowed while a quotation is in draft — once sent/accepted,
-// customers may be holding a copy, so the document should not silently change.
+// customers may be holding a copy, so the document should not silently
+// change. Use "Revise" instead to create an editable copy of a sent one.
 const update = async (req, res) => {
   const quotation = await Quotation.findByPk(req.params.id);
   if (!quotation || !isOwnerOrAdmin(quotation, req)) {
     return res.status(404).json({ error: 'Quotation not found' });
   }
   if (quotation.status !== 'draft') {
-    return res.status(400).json({ error: `Cannot edit a quotation in "${quotation.status}" status` });
+    return res.status(400).json({ error: `Cannot edit a quotation in "${quotation.status}" status — use Revise instead` });
   }
 
-  const { customerId, issueDate, expiryDate, subject, notes, terms, samples, discount, gstApplicable, gstPercent } = req.body;
+  const { customerId, issueDate, expiryDate, subject, notes, terms, samples, discountPercent, gstApplicable, gstPercent } = req.body;
 
   await sequelize.transaction(async (t) => {
     const patch = { customerId, issueDate, expiryDate, notes, terms };
     if (subject !== undefined) patch.subject = subject;
     const nextGstApplicable = gstApplicable !== undefined ? Boolean(gstApplicable) : quotation.gstApplicable;
     const nextGstPercent = gstPercent !== undefined ? gstPercent : quotation.gstPercent;
-    const nextDiscountCents = discount !== undefined ? toCents(discount) : quotation.discountCents;
+    const nextDiscountPercent = discountPercent !== undefined ? discountPercent : quotation.discountPercent;
 
     if (Array.isArray(samples) && samples.length > 0) {
       const lines = await buildLinesAndSaveNewParameters(samples, t);
-      const { subtotalCents, gstCents, totalCents } = computeTotalsFromLines(
-        lines, nextDiscountCents, nextGstApplicable, nextGstPercent
+      const { subtotalCents, discountCents, gstCents, totalCents } = computeTotalsFromLines(
+        lines, nextDiscountPercent, nextGstApplicable, nextGstPercent
       );
       Object.assign(patch, {
         subtotalCents,
-        discountCents: nextDiscountCents,
+        discountPercent: nextDiscountPercent,
+        discountCents,
         gstApplicable: nextGstApplicable,
         gstPercent: nextGstPercent,
         gstCents,
@@ -226,16 +223,17 @@ const update = async (req, res) => {
         lines.map((li) => ({ ...li, quotationId: quotation.id })),
         { transaction: t }
       );
-    } else if (discount !== undefined || gstApplicable !== undefined || gstPercent !== undefined) {
+    } else if (discountPercent !== undefined || gstApplicable !== undefined || gstPercent !== undefined) {
       // Discount/GST changed without touching samples — recompute from
       // the existing lines so the total stays correct.
       const existingLines = await QuotationLineItem.findAll({ where: { quotationId: quotation.id }, transaction: t });
-      const { subtotalCents, gstCents, totalCents } = computeTotalsFromLines(
-        existingLines, nextDiscountCents, nextGstApplicable, nextGstPercent
+      const { subtotalCents, discountCents, gstCents, totalCents } = computeTotalsFromLines(
+        existingLines, nextDiscountPercent, nextGstApplicable, nextGstPercent
       );
       Object.assign(patch, {
         subtotalCents,
-        discountCents: nextDiscountCents,
+        discountPercent: nextDiscountPercent,
+        discountCents,
         gstApplicable: nextGstApplicable,
         gstPercent: nextGstPercent,
         gstCents,
@@ -264,6 +262,75 @@ const setStatus = async (req, res) => {
   res.json(quotation);
 };
 
+// Creates a new, fully-editable draft quotation that's a copy of this
+// one — new quotation number (same root number with a "-R<n>" suffix),
+// linked back via revisionOfId. The original is never modified, so
+// anyone already holding a copy of it is unaffected.
+const revise = async (req, res) => {
+  const source = await Quotation.findByPk(req.params.id, { include: [{ model: QuotationLineItem, as: 'lineItems' }] });
+  if (!source || !isOwnerOrAdmin(source, req)) {
+    return res.status(404).json({ error: 'Quotation not found' });
+  }
+
+  const result = await sequelize.transaction(async (t) => {
+    const nextRevisionNumber = source.revisionNumber + 1;
+    // Strip any existing "-R<n>" suffix from the root number before
+    // appending the new one, so revising a revision stays clean
+    // (QT-006-R1 revised again becomes QT-006-R2, not QT-006-R1-R2).
+    const rootNumber = source.quotationNumber.replace(/-R\d+$/, '');
+    const quotationNumber = `${rootNumber}-R${nextRevisionNumber}`;
+
+    const revised = await Quotation.create(
+      {
+        quotationNumber,
+        customerId: source.customerId,
+        issueDate: new Date().toISOString().slice(0, 10),
+        expiryDate: source.expiryDate,
+        subject: source.subject,
+        notes: source.notes,
+        terms: source.terms,
+        status: 'draft',
+        subtotalCents: source.subtotalCents,
+        discountPercent: source.discountPercent,
+        discountCents: source.discountCents,
+        gstApplicable: source.gstApplicable,
+        gstPercent: source.gstPercent,
+        gstCents: source.gstCents,
+        totalCents: source.totalCents,
+        createdById: req.user.id,
+        salesPersonName: req.user.name,
+        salesPersonDesignation: req.user.designation || null,
+        salesPersonContactNo: req.user.contactNo || null,
+        revisionOfId: source.id,
+        revisionNumber: nextRevisionNumber,
+      },
+      { transaction: t }
+    );
+
+    await QuotationLineItem.bulkCreate(
+      source.lineItems.map((li) => ({
+        sampleName: li.sampleName,
+        sampleIndex: li.sampleIndex,
+        pricingGroupIndex: li.pricingGroupIndex,
+        parameterName: li.parameterName,
+        sampleQty: li.sampleQty,
+        sampleCount: li.sampleCount,
+        isCombinedPricing: li.isCombinedPricing,
+        chargesPerSampleCents: li.chargesPerSampleCents,
+        lineTotalCents: li.lineTotalCents,
+        sortOrder: li.sortOrder,
+        quotationId: revised.id,
+      })),
+      { transaction: t }
+    );
+
+    return revised.id;
+  });
+
+  const created = await Quotation.findByPk(result, { include: INCLUDE });
+  res.status(201).json(created);
+};
+
 const remove = async (req, res) => {
   const quotation = await Quotation.findByPk(req.params.id);
   if (!quotation || !isOwnerOrAdmin(quotation, req)) {
@@ -276,4 +343,4 @@ const remove = async (req, res) => {
   res.status(204).send();
 };
 
-module.exports = { list, get, create, update, setStatus, remove };
+module.exports = { list, get, create, update, setStatus, revise, remove };

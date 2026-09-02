@@ -68,6 +68,7 @@ export default function App() {
       <Route path="/parameters" element={<ProtectedRoute><Layout><Parameters /></Layout></ProtectedRoute>} />
       <Route path="/quotations" element={<ProtectedRoute><Layout><Quotations /></Layout></ProtectedRoute>} />
       <Route path="/quotations/new" element={<ProtectedRoute><Layout><QuotationForm /></Layout></ProtectedRoute>} />
+      <Route path="/quotations/:id/edit" element={<ProtectedRoute><Layout><QuotationForm /></Layout></ProtectedRoute>} />
       <Route path="/quotations/:id" element={<ProtectedRoute><Layout><QuotationDetail /></Layout></ProtectedRoute>} />
       <Route path="/purchase-orders" element={<ProtectedRoute><Layout><PurchaseOrders /></Layout></ProtectedRoute>} />
       <Route path="/purchase-orders/new" element={<ProtectedRoute><Layout><PurchaseOrderForm /></Layout></ProtectedRoute>} />

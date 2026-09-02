@@ -46,6 +46,7 @@ const exportQuotations = async (req, res) => {
     'Valid Until': q.expiryDate || '',
     'Status': q.status,
     'Subtotal': toRupees(q.subtotalCents),
+    'Discount %': Number(q.discountPercent),
     'Discount': toRupees(q.discountCents),
     'GST %': q.gstApplicable ? Number(q.gstPercent) : 0,
     'GST Amount': toRupees(q.gstCents),

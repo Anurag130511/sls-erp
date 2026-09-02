@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 
 const NEXT_STATUSES = {
@@ -12,10 +12,12 @@ const NEXT_STATUSES = {
 
 export default function QuotationDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [quotation, setQuotation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
+  const [revising, setRevising] = useState(false);
 
   const load = () => api.get(`/quotations/${id}`).then(setQuotation).finally(() => setLoading(false));
   useEffect(() => { load(); }, [id]);
@@ -23,6 +25,21 @@ export default function QuotationDetail() {
   const changeStatus = async (status) => {
     await api.patch(`/quotations/${id}/status`, { status });
     load();
+  };
+
+  // Creates an editable copy of a quotation that's already been sent —
+  // the original is left untouched, so anyone who already has a copy of
+  // it isn't affected. Jumps straight into editing the new draft.
+  const reviseQuotation = async () => {
+    setRevising(true);
+    try {
+      const revised = await api.post(`/quotations/${id}/revise`);
+      navigate(`/quotations/${revised.id}/edit`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRevising(false);
+    }
   };
 
   // Uses a synthetic <a download> click rather than window.open() — many
@@ -68,11 +85,26 @@ export default function QuotationDetail() {
           <button className="btn secondary" onClick={downloadPdf} disabled={downloading}>
             {downloading ? 'Preparing…' : 'Download PDF'}
           </button>
+          {quotation.status === 'draft' && (
+            <Link to={`/quotations/${id}/edit`}><button className="btn secondary">Edit</button></Link>
+          )}
+          {quotation.status !== 'draft' && (
+            <button className="btn secondary" onClick={reviseQuotation} disabled={revising}>
+              {revising ? 'Creating revision…' : 'Revise'}
+            </button>
+          )}
           {(NEXT_STATUSES[quotation.status] || []).map((s) => (
             <button key={s} className="btn" onClick={() => changeStatus(s)}>Mark {s}</button>
           ))}
         </div>
       </div>
+
+      {quotation.revisionOf && (
+        <p style={{ fontSize: 13, color: '#777', marginTop: -12, marginBottom: 16 }}>
+          Revision {quotation.revisionNumber} of{' '}
+          <Link to={`/quotations/${quotation.revisionOf.id}`}>{quotation.revisionOf.quotationNumber}</Link>
+        </p>
+      )}
 
       {downloadError && (
         <p style={{ color: '#C0392B', fontSize: 13, marginTop: -12, marginBottom: 16 }}>{downloadError}</p>
@@ -165,16 +197,23 @@ export default function QuotationDetail() {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <span>Subtotal</span><span>{fmt(quotation.subtotalCents)}</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span>Discount</span><span>-{fmt(quotation.discountCents)}</span>
-        </div>
+        {Number(quotation.discountPercent) > 0 && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span>Discount ({Number(quotation.discountPercent)}%)</span><span>-{fmt(quotation.discountCents)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span>Total after Discount</span><span>{fmt(quotation.subtotalCents - quotation.discountCents)}</span>
+            </div>
+          </>
+        )}
         {quotation.gstApplicable && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span>GST @ {Number(quotation.gstPercent).toFixed(0)}%</span><span>{fmt(quotation.gstCents)}</span>
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 16, color: 'var(--green-dark)' }}>
-          <span>Total</span><span>{fmt(quotation.totalCents)}</span>
+          <span>Grand Total</span><span>{fmt(quotation.totalCents)}</span>
         </div>
       </div>
     </div>
