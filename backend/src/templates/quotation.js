@@ -20,11 +20,6 @@ const styles = `
     font-size: 12px;
     line-height: 1.45;
   }
-  /* -webkit-text-stroke guarantees a visibly bold look even on hosts
-     where the font-weight:700 face isn't actually installed (a common
-     issue for headless Chromium on minimal Linux servers) — it draws a
-     thin outline in the same color, thickening the letterforms
-     regardless of which font actually ends up rendering. */
   .top-bar {
     height: 5px;
     background: linear-gradient(90deg, ${GREEN} 0%, ${GREEN_DARK} 100%);
@@ -44,11 +39,10 @@ const styles = `
   .letterhead-logo { display: flex; align-items: center; gap: 12px; }
   .letterhead-logo img { height: 46px; }
   .letterhead-details { font-size: 10.5px; color: #444; line-height: 1.55; }
-  .letterhead-details strong { color: #222; font-weight: 700; -webkit-text-stroke: 0.3px currentColor; }
+  .letterhead-details strong { color: #222; font-weight: 700; }
   .accreditation {
     font-size: 10px;
     font-weight: 700;
-    -webkit-text-stroke: 0.3px #fff;
     color: #fff;
     background: ${GREEN_DARK};
     text-align: center;
@@ -69,7 +63,6 @@ const styles = `
   .meta-row .quote-date {
     font-size: 12px;
     font-weight: 700;
-    -webkit-text-stroke: 0.35px currentColor;
     background: ${GRAY_LIGHT};
     border: 1px solid ${GRAY};
     border-radius: 4px;
@@ -89,20 +82,19 @@ const styles = `
   .letter-fields div { margin-bottom: 2px; }
   .letter-fields .label {
     font-weight: 700;
-    -webkit-text-stroke: 0.35px currentColor;
     color: ${GREEN_DARK};
     display: inline-block;
     min-width: 100px;
   }
   .letter-fields .subject-line { font-size: 12.5px; }
-  .letter-fields .subject-value { font-weight: 700; -webkit-text-stroke: 0.35px currentColor; color: #1a1a1a; }
+  .letter-fields .subject-value { font-weight: 700; color: #1a1a1a; }
 
   .greeting { margin: 10px 0; }
   .greeting p { margin: 3px 0; }
-  .greeting .greet-line { font-weight: 700; -webkit-text-stroke: 0.3px currentColor; color: #222; }
+  .greeting .greet-line { font-weight: 700; color: #222; }
 
   .signoff { margin: 10px 0 0 0; }
-  .signoff .label { font-weight: 700; -webkit-text-stroke: 0.3px currentColor; text-decoration: underline; color: ${GREEN_DARK}; }
+  .signoff .label { font-weight: 700; text-decoration: underline; color: ${GREEN_DARK}; }
   .signoff div { margin-top: 1px; }
 
   table.items {
@@ -124,13 +116,11 @@ const styles = `
     background: ${GREEN};
     color: #fff;
     font-weight: 700;
-    -webkit-text-stroke: 0.4px #fff;
     text-transform: uppercase;
     letter-spacing: 0.2px;
     font-size: 10.2px;
   }
   table.items tbody tr:nth-child(even) { background: ${GRAY_LIGHT}; }
-  table.items td strong { -webkit-text-stroke: 0.3px currentColor; }
 
   table.totals {
     width: 320px;
@@ -151,7 +141,6 @@ const styles = `
     background: ${GREEN};
     color: #fff;
     font-weight: 700;
-    -webkit-text-stroke: 0.35px #fff;
     font-size: 13px;
   }
 
@@ -163,7 +152,6 @@ const styles = `
   }
   .signature-block .title {
     font-weight: 700;
-    -webkit-text-stroke: 0.3px currentColor;
     color: ${GREEN_DARK};
     margin-bottom: 3px;
     font-size: 11.5px;
@@ -179,7 +167,6 @@ const styles = `
   }
   .terms .heading {
     font-weight: 700;
-    -webkit-text-stroke: 0.3px #fff;
     color: #fff;
     background: ${GREEN_DARK};
     display: inline-block;
