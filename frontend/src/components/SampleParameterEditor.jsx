@@ -6,8 +6,54 @@
 // into a single growing group, so a sample can freely mix individually
 // -priced parameters with one or more combined-price groups, all at
 // once. Sample Qty. and Sample Count always apply to the whole sample.
+import { useState } from 'react';
+import { api } from '../api/client';
+
 export default function SampleParameterEditor({ sample, sampleIndex, onChange, onRemoveSample, catalogParameters, canRemoveSample }) {
+  const [autoFillNote, setAutoFillNote] = useState('');
+
+  // Group the catalog dropdown by category (Physical/Chemical/etc.) so
+  // it's easy to browse instead of one long flat list — anything
+  // without a category falls under "Other."
+  const catalogGroups = [];
+  for (const p of catalogParameters) {
+    const cat = p.category || 'Other';
+    let group = catalogGroups.find((g) => g.category === cat);
+    if (!group) {
+      group = { category: cat, items: [] };
+      catalogGroups.push(group);
+    }
+    group.items.push(p);
+  }
+
   const updateField = (patch) => onChange({ ...sample, ...patch });
+
+  // If this sample name matches one used on a past quotation, offer to
+  // fill in the same parameters automatically — only when the parameter
+  // list is still untouched (a single blank row), so it never overwrites
+  // anything the person has already started entering by hand.
+  const isUntouched = sample.parameters.length === 1 && !sample.parameters[0].description.trim();
+
+  const handleSampleNameBlur = async () => {
+    setAutoFillNote('');
+    const name = sample.sampleName.trim();
+    if (!name || !isUntouched) return;
+    try {
+      const match = await api.get(`/quotations/sample-lookup?sampleName=${encodeURIComponent(name)}`);
+      if (match && match.parameters && match.parameters.length > 0) {
+        onChange({
+          ...sample,
+          sampleQty: match.sampleQty,
+          sampleCount: match.sampleCount,
+          parameters: match.parameters,
+        });
+        setAutoFillNote(`Filled in from a previous "${name}" quotation — adjust as needed.`);
+      }
+    } catch (err) {
+      // Silent — auto-fill is a convenience, not something worth
+      // interrupting the form for if it fails.
+    }
+  };
 
   const updateParameter = (paramIndex, patch) => {
     const nextParameters = [...sample.parameters];
@@ -58,6 +104,7 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
             required
             value={sample.sampleName}
             onChange={(e) => updateField({ sampleName: e.target.value })}
+            onBlur={handleSampleNameBlur}
             placeholder={`e.g. Water Sample ${sampleIndex + 1}`}
           />
         </div>
@@ -65,6 +112,10 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
           <button type="button" className="btn danger" onClick={onRemoveSample}>Remove Sample</button>
         )}
       </div>
+
+      {autoFillNote && (
+        <p style={{ fontSize: 12, color: 'var(--green-dark)', marginTop: -8, marginBottom: 10 }}>{autoFillNote}</p>
+      )}
 
       <table className="line-items-table" style={{ marginBottom: 10 }}>
         <thead>
@@ -84,8 +135,12 @@ export default function SampleParameterEditor({ sample, sampleIndex, onChange, o
                 <td>
                   <select value={param.parameterId || ''} onChange={(e) => pickCatalogParameter(paramIndex, e.target.value)}>
                     <option value="">— custom —</option>
-                    {catalogParameters.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                    {catalogGroups.map((group) => (
+                      <optgroup key={group.category} label={group.category}>
+                        {group.items.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </td>

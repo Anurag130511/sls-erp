@@ -2,7 +2,7 @@ const { Parameter } = require('../models');
 const { toCents } = require('../utils/money');
 
 const list = async (req, res) => {
-  const parameters = await Parameter.findAll({ order: [['name', 'ASC']] });
+  const parameters = await Parameter.findAll({ order: [['category', 'ASC'], ['name', 'ASC']] });
   res.json(parameters);
 };
 

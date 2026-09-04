@@ -24,6 +24,7 @@ const ITEM_ALIAS_MAP = {
 const PARAMETER_ALIAS_MAP = {
   name: ['name', 'parameter', 'parameter name', 'test', 'test name'],
   code: ['code', 'parameter code', 'test code'],
+  category: ['category', 'group', 'parameter group', 'parameter category', 'type'],
   description: ['description', 'details', 'method'],
   unit: ['unit', 'uom'],
   unitPrice: ['unit price', 'price', 'rate', 'test price'],
@@ -35,8 +36,8 @@ const PARTY_TEMPLATE_EXAMPLE = ['Acme Labs Pvt. Ltd.', 'Mr. Ravi Kumar', '123 In
 const ITEM_TEMPLATE_HEADERS = ['Name', 'SKU', 'Description', 'Unit', 'Unit Price'];
 const ITEM_TEMPLATE_EXAMPLE = ['Listeria monocytogenes ATCC 19111', 'MC-ATCC-19111', 'Passage Third (Packing - 2 sticks)', 'kit', '14700'];
 
-const PARAMETER_TEMPLATE_HEADERS = ['Name', 'Code', 'Description', 'Unit', 'Unit Price'];
-const PARAMETER_TEMPLATE_EXAMPLE = ['pH', 'PH-01', 'IS 3025 (Part 11)', 'test', '250'];
+const PARAMETER_TEMPLATE_HEADERS = ['Name', 'Code', 'Category', 'Description', 'Unit', 'Unit Price'];
+const PARAMETER_TEMPLATE_EXAMPLE = ['pH', 'PH-01', 'Physical', 'IS 3025 (Part 11)', 'test', '250'];
 
 async function importParties(Model, req, res) {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -162,6 +163,7 @@ async function importParameters(req, res) {
     const record = await Parameter.create({
       name: mapped.name,
       code: mapped.code || null,
+      category: mapped.category || null,
       description: mapped.description || null,
       unit: mapped.unit || 'test',
       unitPriceCents: toCents(priceNumber || 0),

@@ -101,6 +101,56 @@ function computeTotalsFromLines(lines, discountPercent, gstApplicable, gstPercen
   return { subtotalCents, discountCents, gstCents, totalCents };
 }
 
+// GET /api/quotations/sample-lookup?sampleName=... — looks up the most
+// recently used quotation with an exact (case-insensitive) match on
+// that sample name, and returns its full parameter set ready to drop
+// straight into the form — so a recurring sample type (e.g. "Drinking
+// Water") doesn't need its parameters re-typed every time. Scoped the
+// same way as everything else: non-admins only search their own past
+// quotations, admins search everyone's.
+const sampleLookup = async (req, res) => {
+  const sampleName = (req.query.sampleName || '').trim();
+  if (!sampleName) return res.json(null);
+
+  const quotationWhere = {};
+  if (req.user.role !== 'admin') quotationWhere.createdById = req.user.id;
+
+  const match = await QuotationLineItem.findOne({
+    where: sequelize.where(sequelize.fn('LOWER', sequelize.col('QuotationLineItem.sampleName')), sampleName.toLowerCase()),
+    include: [{ model: Quotation, attributes: [], where: quotationWhere }],
+    order: [['createdAt', 'DESC']],
+  });
+  if (!match) return res.json(null);
+
+  const lines = await QuotationLineItem.findAll({
+    where: { quotationId: match.quotationId, sampleIndex: match.sampleIndex },
+    order: [['sortOrder', 'ASC']],
+  });
+  if (lines.length === 0) return res.json(null);
+
+  // Rebuild the same {parameters, sampleQty, sampleCount} shape the form
+  // uses, so the frontend can drop this straight in — the first row of
+  // each pricing group carries that group's price; the rest are marked
+  // combineWithPrevious.
+  const seenGroups = new Set();
+  const parameters = lines.map((li) => {
+    const isFirstInGroup = !seenGroups.has(li.pricingGroupIndex);
+    seenGroups.add(li.pricingGroupIndex);
+    return {
+      parameterId: null,
+      description: li.parameterName,
+      charges: isFirstInGroup ? (li.chargesPerSampleCents / 100).toString() : '',
+      combineWithPrevious: !isFirstInGroup,
+    };
+  });
+
+  res.json({
+    sampleQty: Number(lines[0].sampleQty),
+    sampleCount: Number(lines[0].sampleCount),
+    parameters,
+  });
+};
+
 const list = async (req, res) => {
   const { status, customerId, userId } = req.query;
   const where = {};
@@ -346,4 +396,4 @@ const remove = async (req, res) => {
   res.status(204).send();
 };
 
-module.exports = { list, get, create, update, setStatus, revise, remove };
+module.exports = { list, get, create, update, setStatus, revise, remove, sampleLookup };

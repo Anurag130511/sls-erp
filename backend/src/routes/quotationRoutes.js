@@ -6,6 +6,7 @@ const { getOrCreateQuotationPdf } = require('../controllers/documentController')
 
 router.use(requireAuth);
 router.get('/', ctrl.list);
+router.get('/sample-lookup', ctrl.sampleLookup);
 router.get('/:id', ctrl.get);
 router.post('/', ctrl.create);
 router.put('/:id', ctrl.update);

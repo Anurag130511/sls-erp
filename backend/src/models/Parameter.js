@@ -11,6 +11,10 @@ const Parameter = sequelize.define('Parameter', {
   name: { type: DataTypes.STRING, allowNull: false },
   description: { type: DataTypes.TEXT },
   code: { type: DataTypes.STRING }, // optional short code, e.g. "PH-01"
+  // Free text, not a fixed list — e.g. "Physical", "Chemical",
+  // "Microbiological", "Nutritional" — so new categories can be added
+  // just by typing one, without a code change.
+  category: { type: DataTypes.STRING, allowNull: true },
   unit: { type: DataTypes.STRING, defaultValue: 'test' },
   unitPriceCents: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 });

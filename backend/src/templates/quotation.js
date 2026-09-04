@@ -208,6 +208,23 @@ const styles = `
     color: #fff;
     background: ${GREEN_DARK};
   }
+
+  /* position: fixed repeats this on every printed page (not just the
+     first) when Puppeteer renders to PDF — so it still shows up even if
+     a quotation ever grows past one page. Sits behind all content since
+     it's the first element in the body and everything else has its own
+     background where it needs to stay readable. */
+  .watermark {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 460px;
+    height: 460px;
+    opacity: 0.07;
+    z-index: -1;
+    pointer-events: none;
+  }
 `;
 
 function quotationHtml(quotation, org, logoDataUri, signatureDataUri) {
@@ -308,6 +325,18 @@ function quotationHtml(quotation, org, logoDataUri, signatureDataUri) {
   </head>
   <body>
   <div class="top-bar"></div>
+  <svg class="watermark" viewBox="0 0 460 460" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <path id="wmCircle" d="M 230,230 m -190,0 a 190,190 0 1,1 380,0 a 190,190 0 1,1 -380,0" />
+    </defs>
+    <circle cx="230" cy="230" r="190" fill="none" stroke="${GREEN_DARK}" stroke-width="3" />
+    <circle cx="230" cy="230" r="150" fill="none" stroke="${GREEN_DARK}" stroke-width="2" />
+    <text font-size="21" font-weight="700" letter-spacing="3" fill="${GREEN_DARK}">
+      <textPath href="#wmCircle" startOffset="0%">
+        ${escapeHtml(org.name.toUpperCase())} &#8226; ${escapeHtml(org.name.toUpperCase())} &#8226;
+      </textPath>
+    </text>
+  </svg>
   <div class="page">
     <div class="letterhead">
       <div class="letterhead-logo">
